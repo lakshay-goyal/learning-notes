@@ -1,0 +1,7 @@
+interface:
+  display_name: "DeepLearn"
+  short_description: "Research and teach technical topics deeply"
+  default_prompt: "Use $deep-learn to research and teach me a technical topic, then save a validated Markdown learning package in docs/."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "outputDirectory": "docs",
+  "defaultMode": "deep",
+  "preferredProgrammingLanguage": "TypeScript",
+  "preferredFrontendFramework": "React and Next.js",
+  "preferredBackendEnvironment": "Node.js",
+  "preferredMobileEnvironment": "React Native and Expo",
+  "preferredCloudPlatform": "AWS with Terraform",
+  "repositoryInvestigationDepth": "source-trace",
+  "maximumPrimaryRepositories": 3,
+  "projectIdeasEnabled": true,
+  "practicalExercisesEnabled": true,
+  "requireVersionVerification": true,
+  "includeProductionAnalysisByDefault": true,
+  "requiredCoreFiles": [
+    "README.md",
+    "research-plan.md",
+    "implementation.md",
+    "exercises.md",
+    "revision.md",
+    "sources.md"
+  ],
+  "validation": {
+    "failOnBrokenLocalLinks": true,
+    "failOnNonMarkdownLearningFiles": true,
+    "requireIndexEntry": true
+  }
+}
