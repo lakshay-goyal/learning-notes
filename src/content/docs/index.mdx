@@ -1,40 +1,87 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: My Learning Hub
+description: All my learnings in one place — software, AI, mobile, system design, DevOps, UI, soft skills & tools.
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
+  tagline: One repo for everything I'm learning — notes, guides, and deep-dives across engineering, design, and growth.
   image:
     file: ../../assets/houston.webp
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Browse Software Development
+      link: /software-development/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
-      icon: external
+    - text: Explore all topics below
+      link: '/#topics'
+      icon: down-arrow
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+<h2 id="topics">Topics</h2>
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
-	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
-	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
-	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
-	</Card>
+  <Card title="Software Development" icon="code">
+    Languages, frameworks, clean code, testing, backend & frontend notes.
+    [Browse notes →](/software-development/)
+  </Card>
+  <Card title="AI Engineering" icon="rocket">
+    LLMs, prompts, RAG, agents, evals, fine-tuning, and AI apps.
+    [Browse notes →](/ai-engineering/)
+  </Card>
+  <Card title="Mobile Development" icon="mobile-android">
+    Android, iOS, Flutter, React Native — UI, navigation, storage, release.
+    [Browse notes →](/mobile-development/)
+  </Card>
+  <Card title="System Design" icon="server">
+    HLD & LLD, scaling, caching, queues, CAP, interviews prep.
+    [Browse notes →](/system-design/)
+  </Card>
+  <Card title="DevOps" icon="cloud">
+    CI/CD, containers, Kubernetes, monitoring, cloud fundamentals.
+    [Browse notes →](/devops/)
+  </Card>
+  <Card title="UI Design" icon="pencil">
+    Figma, design systems, color, typography, UX patterns, inspirations.
+    [Browse notes →](/ui-design/)
+  </Card>
+  <Card title="Soft Skills" icon="comment">
+    Communication, leadership, productivity, learning, career growth.
+    [Browse notes →](/soft-skills/)
+  </Card>
+  <Card title="Tools" icon="setting">
+    Git, Linux, Docker and other tool-specific power skills.
+    [Browse notes →](/tools/)
+  </Card>
 </CardGrid>
+
+## Tool-specific skills
+
+<CardGrid>
+  <Card title="Git" icon="seti:git">
+    Everyday commands, branching, rebasing, and recovery.
+    [Git notes →](/tools/git/)
+  </Card>
+  <Card title="Linux" icon="linux">
+    Shell, filesystem, permissions, networking, and scripting.
+    [Linux notes →](/tools/linux/)
+  </Card>
+  <Card title="Docker" icon="seti:docker">
+    Images, containers, volumes, networks, and Compose.
+    [Docker notes →](/tools/docker/)
+  </Card>
+</CardGrid>
+
+## How to add a new note
+
+1. Pick a topic folder under `src/content/docs/`, e.g. `ai-engineering/`.
+2. Add a new `.md` or `.mdx` file, e.g. `rag-basics.md`, with frontmatter:
+   ```md
+   ---
+   title: My Note Title
+   description: One-line summary.
+   ---
+   ```
+3. It appears automatically in the sidebar (autogenerate) and is searchable.
+
+> Tip: each topic has an `index.md` landing page. Link sub-pages from there for curated learning paths.
