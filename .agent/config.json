@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "researchDirectory": "docs",
+  "learningDirectory": "src/content/docs",
+  "coverageDirectory": ".agent/coverage",
+  "learningComponentsDirectory": "src/components/learning",
+  "researchRoutePrefix": "/research",
+  "progressStorage": "browser-local",
+  "progressStorageKey": "deep-learn-visual:v1",
+  "requiredLearningLevels": [
+    "quick-recall",
+    "visual-understanding",
+    "complete-understanding",
+    "active-recall"
+  ],
+  "validation": {
+    "requireCoverageMap": true,
+    "requireResearchLink": true,
+    "requireStableTopicId": true,
+    "requireAstroBuild": true
+  }
+}

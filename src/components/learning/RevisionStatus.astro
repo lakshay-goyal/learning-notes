@@ -1,0 +1,101 @@
+---
+interface Props {
+	topicId: string;
+	title: string;
+}
+
+const { topicId, title } = Astro.props;
+---
+
+<aside class="revision-status not-content" data-revision-status data-topic-id={topicId} data-title={title}>
+	<div>
+		<p class="learning-kicker">Retention</p>
+		<strong data-revision-label>Not registered for revision</strong>
+		<span data-revision-detail>Progress stays in this browser only.</span>
+	</div>
+	<div class="revision-actions">
+		<a href="#test-yourself">Review questions</a>
+		<button type="button" class="learning-action" data-mark-learned>Mark learned</button>
+	</div>
+</aside>
+
+<script>
+	const REVISION_STORAGE_KEY = 'deep-learn-visual:v1';
+	const REVISION_DAY = 86_400_000;
+
+	function readRevisionState() {
+		try {
+			return JSON.parse(localStorage.getItem(REVISION_STORAGE_KEY) || '{"topics":{}}');
+		} catch {
+			return { topics: {} };
+		}
+	}
+
+	function wireRevisionStatus() {
+		document.querySelectorAll('[data-revision-status]').forEach((root) => {
+			if (!(root instanceof HTMLElement) || root.dataset.wired === 'true') return;
+			root.dataset.wired = 'true';
+			const topicId = root.dataset.topicId;
+			const title = root.dataset.title;
+			const label = root.querySelector('[data-revision-label]');
+			const detail = root.querySelector('[data-revision-detail]');
+			const button = root.querySelector('[data-mark-learned]');
+			if (!topicId) return;
+
+			const render = () => {
+				const topic = readRevisionState().topics?.[topicId];
+				if (!topic) return;
+				if (label) label.textContent = topic.status === 'learned' ? 'Registered for revision' : 'Currently studying';
+				const reviewed = Object.keys(topic.questions ?? {}).length;
+				if (detail) detail.textContent = `${reviewed} recall prompt${reviewed === 1 ? '' : 's'} attempted · browser-local progress`;
+				if (button) button.textContent = topic.status === 'learned' ? 'Learning saved' : 'Mark learned';
+			};
+
+			const state = readRevisionState();
+			state.topics ??= {};
+			const topic = (state.topics[topicId] ??= { status: 'studying', questions: {} });
+			topic.title = title;
+			topic.lastOpened = new Date().toISOString();
+			localStorage.setItem(REVISION_STORAGE_KEY, JSON.stringify(state));
+			render();
+
+			button?.addEventListener('click', () => {
+				const next = readRevisionState();
+				const current = (next.topics[topicId] ??= { questions: {} });
+				current.title = title;
+				current.status = 'learned';
+				current.completedAt = new Date().toISOString();
+				current.nextReview = new Date(Date.now() + 3 * REVISION_DAY).toISOString();
+				localStorage.setItem(REVISION_STORAGE_KEY, JSON.stringify(next));
+				render();
+				window.dispatchEvent(new CustomEvent('deep-learn-progress'));
+			});
+		});
+	}
+
+	document.addEventListener('astro:page-load', wireRevisionStatus);
+	wireRevisionStatus();
+</script>
+
+<style>
+	.revision-status {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin: 1rem 0 1.5rem;
+		border: 1px solid var(--learn-border);
+		border-radius: 0.9rem;
+		padding: 0.85rem 1rem;
+		background: color-mix(in srgb, var(--learn-green) 7%, var(--sl-color-bg));
+	}
+	.revision-status > div:first-child { display: grid; gap: 0.12rem; }
+	.revision-status strong { font-size: 0.92rem; }
+	.revision-status span { color: var(--sl-color-gray-3); font-size: 0.75rem; }
+	.revision-actions { display: flex; align-items: center; gap: 0.65rem; }
+	.revision-actions a { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+	@media (max-width: 38rem) {
+		.revision-status { align-items: stretch; flex-direction: column; }
+		.revision-actions { justify-content: space-between; }
+	}
+</style>

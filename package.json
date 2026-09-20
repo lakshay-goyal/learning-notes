@@ -2,13 +2,16 @@
   "name": "notes_recorder",
   "type": "module",
   "version": "0.0.1",
-  "scripts": {
-    "dev": "astro dev",
-    "start": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
-  },
+	"scripts": {
+		"dev": "astro dev",
+		"start": "astro dev",
+		"build": "astro build",
+		"preview": "astro preview",
+		"astro": "astro",
+		"test": "node --test scripts/*.test.mjs",
+		"validate:research": "node scripts/deep-learn.mjs validate --all --strict",
+		"validate:learning": "node scripts/deep-learn-visual.mjs validate --all --strict"
+	},
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.4.1",
     "@astrojs/starlight": "^0.42.2",

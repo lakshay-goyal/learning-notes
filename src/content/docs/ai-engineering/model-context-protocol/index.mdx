@@ -1,0 +1,477 @@
+---
+title: Model Context Protocol
+description: Reconstruct MCP in minutes—its integration boundary, primitives, tool-call flow, protocol eras, transports, production risks, and TypeScript SDK internals.
+tags: [visual, diagrams, quiz]
+learning:
+  id: model-context-protocol
+  category: AI Engineering
+  difficulty: intermediate
+  researchSlug: model-context-protocol
+  updated: 2026-09-21
+  prerequisites:
+    - TypeScript and asynchronous I/O
+    - HTTP and request/response protocols
+    - JSON Schema and basic OAuth
+  relations:
+    - id: ai-engineering
+      type: belongs-to
+      label: AI Engineering
+      href: /ai-engineering/
+sidebar:
+  order: 1
+  badge:
+    text: Visual
+    variant: success
+---
+
+import { Aside, Card, CardGrid, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import QuickRecall from '../../../../components/learning/QuickRecall.astro';
+import MentalModel from '../../../../components/learning/MentalModel.astro';
+import ConceptDiagram from '../../../../components/learning/ConceptDiagram.astro';
+import ExecutionTimeline from '../../../../components/learning/ExecutionTimeline.astro';
+import CodeWalkthrough from '../../../../components/learning/CodeWalkthrough.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import DeepDive from '../../../../components/learning/DeepDive.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="AI Engineering"
+  difficulty="Intermediate"
+  version="MCP 2026-07-28 · TypeScript SDK 2.0.0"
+  prerequisites={['TypeScript', 'HTTP', 'JSON-RPC', 'JSON Schema', 'OAuth basics']}
+  relations={[{ type: 'belongs to', label: 'AI Engineering', href: '/ai-engineering/' }]}
+  researchHref="/research/model-context-protocol/"
+/>
+
+<RevisionStatus topicId="model-context-protocol" title="Model Context Protocol" />
+
+<QuickRecall
+  definition="MCP is an open, JSON-RPC-based application protocol that lets an AI host discover and invoke capabilities exposed by independent servers through one interoperable contract."
+  problem="Without a shared contract, every AI host needs a bespoke connector for every repository, calendar, database, or internal service."
+  mentalModel="MCP is a USB-like integration boundary for AI applications: it standardizes how capabilities plug in, not what the host should decide or what the connected service is allowed to do."
+  takeaways={[
+    'The host owns model orchestration, consent, policy, and what enters context.',
+    'Tools, resources, and prompts are capability primitives—not authorization guarantees.',
+    'MCP standardizes discovery and invocation; reliability and business safety remain application work.',
+  ]}
+  whenToUse="Use MCP when independent capability providers, host portability, or standardized discovery are worth an extra protocol and trust boundary."
+/>
+
+## The problem MCP solves
+
+An AI application often needs data and actions from many systems. If each host invents its own discovery format, input schema, invocation method, error model, and lifecycle, integration cost grows roughly with every host–service pair. MCP creates a stable seam between them.
+
+<MentalModel
+  title="Protocol, not agent framework"
+  icon="⇄"
+  model="Think of MCP as the typed conversation between an AI application and a capability provider. The host can discover what exists, call it, and interpret the result without knowing the provider's internal implementation."
+  boundary="USB does not decide whether plugging in a device is safe. Likewise, MCP does not choose a model, plan tasks, authorize a user, secure business logic, or make destructive operations reversible."
+/>
+
+<Aside type="caution" title="Critical boundary">
+Valid protocol framing and schema validation prove that a message has the expected shape. They do **not** prove that the caller may perform the action, that returned content is trustworthy, or that retrying a write is safe.
+</Aside>
+
+## Visual overview
+
+<ConceptDiagram
+  id="mcp-boundary"
+  title="Who owns what?"
+  question="Click a component to inspect its responsibility. The dashed line is a trust boundary, not just a network hop."
+  nodes={[
+    { id: 'user', label: 'User', detail: 'Expresses intent and must understand or confirm consequential actions.', x: 9, y: 50, tone: 'blue' },
+    { id: 'host', label: 'Host application', detail: 'Owns the user experience, model loop, policy, consent, server trust, and context assembly.', x: 30, y: 50, tone: 'purple' },
+    { id: 'model', label: 'Model + orchestration', detail: 'Suggests tool choices or composes responses, but must not become the authorization authority.', x: 30, y: 16, tone: 'amber' },
+    { id: 'client', label: 'MCP client', detail: 'The host-side protocol participant for one server: discovery, calls, transport, and result handling.', x: 51, y: 50, tone: 'blue' },
+    { id: 'server', label: 'MCP server', detail: 'Exposes a focused set of tools, resources, and prompts; validates declared shapes and dispatches handlers.', x: 73, y: 50, tone: 'green' },
+    { id: 'domain', label: 'Domain services + data', detail: 'Own business rules, record-level authorization, durable state, and the actual side effects.', x: 91, y: 50, tone: 'red' },
+    { id: 'controls', label: 'Auth · limits · audit', detail: 'Surround remote serving with token checks, origin/host policy, rate limits, deadlines, redaction, and observability.', x: 73, y: 85, tone: 'amber' },
+  ]}
+  edges={[
+    { from: 'user', to: 'host', label: 'intent' },
+    { from: 'host', to: 'model', label: 'context' },
+    { from: 'model', to: 'host', label: 'proposal' },
+    { from: 'host', to: 'client', label: 'approved call' },
+    { from: 'client', to: 'server', label: 'JSON-RPC', dashed: true },
+    { from: 'server', to: 'domain', label: 'business call' },
+    { from: 'controls', to: 'server', label: 'guard' },
+  ]}
+/>
+
+The important separation is deliberate: the **host** decides what the model may see and call; the **client** speaks the protocol; the **server** publishes a capability surface; the **domain layer** remains responsible for business truth.
+
+## Core primitives
+
+<CardGrid>
+  <Card title="Tool · do something" icon="setting">
+    An executable operation with described inputs and results: search, create an issue, run a query. A schema helps discovery and validation; it is not authorization.
+  </Card>
+  <Card title="Resource · read something" icon="document">
+    Addressable context or data such as file content, a schema, or a record. The host decides whether and how it enters model context.
+  </Card>
+  <Card title="Prompt · start something" icon="comment">
+    A reusable templated message or workflow starter. It guides interaction but does not enforce security or policy.
+  </Card>
+</CardGrid>
+
+Clients may also support **elicitation**, allowing a server-side operation to request more user input. Separately negotiated extensions can add behavior such as durable tasks. Core MCP support never implies that every extension is present.
+
+## A tool call, reconstructed
+
+<ExecutionTimeline
+  title="From discovery to a typed result"
+  question="What happens first, where is validation performed, and when does business code actually run?"
+  steps={[
+    { actor: 'Host → client', title: 'Discover capabilities', detail: 'The host asks its MCP client to list tools.', result: 'The model or product can see names, descriptions, and schemas.' },
+    { actor: 'Client → server', title: 'Send tools/list', detail: 'The server derives a discoverable tool catalog from its registrations.', result: 'No business handler runs yet.' },
+    { actor: 'Host', title: 'Choose under policy', detail: 'The model may propose a tool and arguments; the host applies trust, consent, and product policy.', result: 'A model suggestion is not an authorization decision.' },
+    { actor: 'Client → server', title: 'Send tools/call', detail: 'The request names a tool and supplies arguments over stdio or Streamable HTTP.', result: 'Transport changes delivery, not tool meaning.' },
+    { actor: 'Server', title: 'Validate and dispatch', detail: 'The SDK checks the method, registration, and declared input schema before invoking the typed handler.', result: 'Invalid input is rejected before domain work.' },
+    { actor: 'Handler → server', title: 'Run domain behavior', detail: 'Business code authorizes records, calls dependencies, and returns text, structured content, or a tool error.', result: 'Side-effect safety belongs here and around here.' },
+    { actor: 'Server → client → host', title: 'Validate and interpret result', detail: 'Declared structured output is validated, encoded for the active protocol era, and returned.', result: 'The host decides how the result affects context or the user.' },
+  ]}
+/>
+
+The inspected TypeScript SDK keeps three layers distinct: high-level primitive registration, transport/lifecycle entrypoints, and per-era wire codecs. That prevents every tool handler from branching on protocol revision.
+
+## How it works
+
+### Transport changes delivery, not meaning
+
+<Tabs syncKey="mcp-transport">
+  <TabItem label="stdio">
+    The client launches and owns a local server process. JSON-RPC frames travel as newline-delimited messages over standard input/output. It fits editor tools, local developer utilities, and per-user process isolation.
+
+    **Operational trap:** stdout is the protocol channel. Send diagnostics to stderr, or a log line can corrupt framing.
+  </TabItem>
+  <TabItem label="Streamable HTTP">
+    Each message is an HTTP POST to one endpoint; the response is JSON or a request-scoped server-sent-event stream. It fits independent deployment, remote access, centralized operations, and many clients.
+
+    **Operational trap:** a stateless handler is not a security perimeter. Authentication, origin/host validation, business authorization, limits, and audit controls still surround it.
+  </TabItem>
+</Tabs>
+
+Choose stdio when the host can own a local process and that process boundary is useful. Choose HTTP when remote operation, independent scaling, or shared access matter. Neither transport is inherently trustworthy.
+
+### The protocol-era boundary
+
+Do not silently combine tutorials from these eras:
+
+| Concern | `2025-11-25` and earlier | `2026-07-28` |
+| --- | --- | --- |
+| Opening | `initialize`, then `notifications/initialized` | No required handshake; optional `server/discover` |
+| Version/capabilities | Negotiated and retained for a session | Carried in per-request `_meta` |
+| Session | May use `Mcp-Session-Id` | Protocol session removed |
+| Server needs more input | Server-initiated JSON-RPC request | Returns `input_required`; client retries |
+| Horizontal HTTP serving | May require session routing/state | Any instance can handle a self-contained request |
+
+The 2026 revision removed hidden **protocol session state**, not all application state. A workflow can return a durable state handle that the caller includes in the next request.
+
+<Aside type="note" title="SDK version is not the negotiated protocol era">
+TypeScript SDK v2 supports the modern revision, but a manually constructed client/server can retain legacy behavior. Use the documented serving and negotiation paths; the example below opts into automatic version negotiation.
+</Aside>
+
+## Practical example
+
+<CodeWalkthrough
+  title="A minimal typed add tool"
+  purpose="This isolates the protocol mechanism: register one tool with input/output schemas, then serve it over stdio."
+  annotations={[
+    { lines: '1–3', title: 'Use the v2 public entrypoints', explanation: 'McpServer owns high-level primitive registration; serveStdio owns connection lifecycle and era selection.' },
+    { lines: '5–8', title: 'Create one server per serving callback', explanation: 'The factory makes lifecycle ownership explicit and keeps tool registration together.' },
+    { lines: '10–17', title: 'Declare the contract', explanation: 'Description and schemas drive discovery and validation. Read-only/idempotent annotations are client hints, not enforcement.' },
+    { lines: '18–21', title: 'Return for two consumers', explanation: 'Text is model-readable; structuredContent gives host code a typed JSON value and can be output-validated.' },
+  ]}
+  expected="A client discovers add, calls it with a=20 and b=22, and receives structuredContent { sum: 42 }. The acceptance research executed this path successfully."
+>
+
+```ts title="server.ts" {1-3,10-17,18-21}
+import { McpServer } from '@modelcontextprotocol/server';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import * as z from 'zod/v4';
+
+serveStdio(() => {
+  const server = new McpServer({ name: 'math-learning-server', version: '1.0.0' });
+
+  server.registerTool(
+    'add',
+    {
+      description: 'Add two numbers',
+      inputSchema: z.object({ a: z.number(), b: z.number() }),
+      outputSchema: z.object({ sum: z.number() }),
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ a, b }) => ({
+      content: [{ type: 'text', text: String(a + b) }],
+      structuredContent: { sum: a + b },
+    }),
+  );
+
+  return server;
+});
+```
+
+</CodeWalkthrough>
+
+<CodeWalkthrough
+  title="The client makes modern negotiation explicit"
+  purpose="The client launches the stdio server, discovers the tool before calling it, and asserts the typed result."
+  annotations={[
+    { lines: '4–7', title: 'Opt into version probing', explanation: 'Auto mode probes for the modern protocol and can fall back to a legacy peer.' },
+    { lines: '9–14', title: 'The client owns the process', explanation: 'StdioClientTransport launches the executable and connects its protocol streams.' },
+    { lines: '16–19', title: 'Discover before use', explanation: 'listTools populates the catalog; the SDK can use cached definitions for validation and mirrored metadata.' },
+    { lines: '21–26', title: 'Separate success from transport failure', explanation: 'A successful call returns a result; protocol, SDK, and transport failures can throw through a different surface.' },
+  ]}
+  expected="The final assertion sees { sum: 42 }, then the client closes the subprocess connection."
+>
+
+```ts title="client.ts" {4-7,9-14,16-19,21-26}
+import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+
+const client = new Client(
+  { name: 'math-learning-client', version: '1.0.0' },
+  { versionNegotiation: { mode: 'auto' } },
+);
+
+await client.connect(new StdioClientTransport({
+  command: 'node',
+  args: ['dist/server.js'],
+}));
+
+const listed = await client.listTools();
+assert.deepEqual(listed.tools.map((tool) => tool.name), ['add']);
+
+const result = await client.callTool({
+  name: 'add',
+  arguments: { a: 20, b: 22 },
+});
+assert.deepEqual(result.structuredContent, { sum: 42 });
+
+await client.close();
+```
+
+</CodeWalkthrough>
+
+For the exact tested dependencies, setup command, realistic private-note retrieval design, and production extension, open the [original implementation research](/research/model-context-protocol/implementation/).
+
+## Failure model
+
+The most important production skill is identifying **which boundary failed**:
+
+| Surface | Example | Caller interpretation |
+| --- | --- | --- |
+| Transport | Process exits, HTTP deadline, stream closes, invalid framing | The exchange did not complete; side-effect outcome may still be unknown |
+| Protocol / SDK | Unsupported version/method, malformed JSON-RPC, capability mismatch | Peer or request is incompatible/invalid |
+| Tool result | Handler returns `isError: true` | The tool ran and reported a domain-level failure |
+| Ambiguous side effect | Caller times out after a write committed | Never blindly retry; reconcile with idempotency/status |
+
+<MentalModel
+  title="A timeout is missing information"
+  icon="?"
+  model="After a write crosses the business boundary, a timeout cannot tell you whether nothing happened, the operation committed, or the response was merely lost."
+  boundary="Idempotency keys prevent duplicate intent from becoming duplicate work only when the server stores and reconciles them atomically with operation creation."
+/>
+
+For consequential writes, use a stable idempotency key, separate preview from commit, confirm immediately before commit, return an operation ID, and provide status lookup for uncertain outcomes.
+
+## Security and production engineering
+
+<ConceptDiagram
+  id="mcp-production"
+  title="A remote production boundary"
+  question="Where do security, horizontal scale, durable state, and observability live?"
+  nodes={[
+    { id: 'host', label: 'AI host', detail: 'Applies server trust, user consent, tool exposure, and untrusted-content handling.', x: 8, y: 48, tone: 'purple' },
+    { id: 'gateway', label: 'Gateway / WAF', detail: 'Provides network policy, request-size limits, origin/host defenses, and traffic controls.', x: 27, y: 48, tone: 'amber' },
+    { id: 'auth', label: 'Auth + rate policy', detail: 'Validates issuer, audience/resource, expiry, scopes, and principal; enforces quotas.', x: 46, y: 48, tone: 'red' },
+    { id: 'replica1', label: 'MCP replica A', detail: 'Handles a self-contained request and dispatches a focused primitive.', x: 66, y: 28, tone: 'green' },
+    { id: 'replica2', label: 'MCP replica B', detail: 'Can handle the next request without protocol-session affinity.', x: 66, y: 69, tone: 'green' },
+    { id: 'domain', label: 'Domain + durable state', detail: 'Owns record authorization, idempotency, queues, databases, and workflow handles.', x: 89, y: 48, tone: 'blue' },
+    { id: 'telemetry', label: 'Logs · metrics · traces', detail: 'Separates validation, auth, tool, and dependency failures without recording secrets.', x: 67, y: 92, tone: 'purple' },
+  ]}
+  edges={[
+    { from: 'host', to: 'gateway' },
+    { from: 'gateway', to: 'auth' },
+    { from: 'auth', to: 'replica1' },
+    { from: 'auth', to: 'replica2' },
+    { from: 'replica1', to: 'domain' },
+    { from: 'replica2', to: 'domain' },
+    { from: 'replica1', to: 'telemetry', dashed: true },
+    { from: 'replica2', to: 'telemetry', dashed: true },
+  ]}
+/>
+
+The modern stateless core removes protocol-session affinity; it does not remove shared application dependencies. Authorization data, rate limits, databases, queues, caches, and explicit workflow handles still need their own consistency and failure models.
+
+<CardGrid>
+  <Card title="Identity and authorization" icon="padlock">
+    Authenticate the principal and authorize each operation and record. The model must not choose tenant identity through tool arguments. HTTP tokens must be intended for this resource server and must not be forwarded downstream.
+  </Card>
+  <Card title="Input and output containment" icon="approve-check-circle">
+    Revalidate at domain boundaries, bound result size, sanitize environment inheritance for local servers, and treat resource/tool text as untrusted content that may contain prompt injection.
+  </Card>
+  <Card title="Reliability and limits" icon="analytics">
+    Apply deadlines, concurrency and rate limits, request-size limits, idempotency for writes, stable operation IDs, and explicit cancellation semantics.
+  </Card>
+  <Card title="Observability" icon="magnifier">
+    Record principal, server, tool, authorization decision, outcome, latency, and correlation ID—while redacting tokens, secrets, and sensitive arguments.
+  </Card>
+</CardGrid>
+
+<DeepDive summary="Production checklist and test strategy">
+
+- **Authentication:** verify token issuer, audience/resource, expiry, scopes, and signature.
+- **Authorization:** test cross-tenant and record-level denials separately from authentication.
+- **Consent:** require a meaningful confirmation for destructive or costly actions.
+- **Reliability:** test timeout-before-commit, timeout-after-commit, duplicate delivery, worker crash, cancellation, and status reconciliation.
+- **Capacity:** load-test realistic tool mixes; `tools/list` and a long external-API call have different cost profiles.
+- **Observability:** distinguish protocol rejection, authorization denial, handler/domain failure, and dependency timeout.
+- **Privacy:** prove that logs and traces do not expose credentials or full sensitive results.
+- **Compatibility:** run current conformance tests and add tests that prevent modern methods leaking onto legacy-pinned connections.
+
+</DeepDive>
+
+## Internals and source-reading path
+
+The source-inspected repository is the official TypeScript SDK at commit [`6032170`](https://github.com/modelcontextprotocol/typescript-sdk/tree/60321700871029401a2e3bed8fdf4f02c9ec3331). Read it in this order:
+
+<Steps>
+
+1. Start with [`examples/tools/server.ts`](https://github.com/modelcontextprotocol/typescript-sdk/blob/60321700871029401a2e3bed8fdf4f02c9ec3331/examples/tools/server.ts) and [`examples/tools/client.ts`](https://github.com/modelcontextprotocol/typescript-sdk/blob/60321700871029401a2e3bed8fdf4f02c9ec3331/examples/tools/client.ts) to see public behavior.
+2. Follow registration and `tools/call` into [`packages/server/src/server/mcp.ts`](https://github.com/modelcontextprotocol/typescript-sdk/blob/60321700871029401a2e3bed8fdf4f02c9ec3331/packages/server/src/server/mcp.ts).
+3. Follow client behavior in [`packages/client/src/client/client.ts`](https://github.com/modelcontextprotocol/typescript-sdk/blob/60321700871029401a2e3bed8fdf4f02c9ec3331/packages/client/src/client/client.ts) and version probing in `versionNegotiation.ts`.
+4. Compare `serveStdio.ts` with `createMcpHandler.ts` to see how connection/request lifetimes select an era.
+5. Read `wire/codec.ts` and the modern/legacy registries to see wire differences isolated from primitive handlers.
+6. Finish with transport tests and `.github/workflows/conformance.yml`; then deliberately violate an output schema and trace the failure.
+
+</Steps>
+
+<DeepDive summary="Exact tools/call source path">
+
+1. `Client.callTool()` receives the tool name and arguments. A warm discovery cache can enable output validation and mirrored parameter headers.
+2. The active transport delivers JSON-RPC. HTTP classifies the request era under a body-size bound; stdio is pinned to an era for the connection.
+3. The server entrypoint creates or selects the low-level server and performs lifecycle/capability checks.
+4. `McpServer` finds the registered tool, validates arguments using the declared Standard Schema, and invokes the executor with typed input and server context.
+5. Declared structured output is validated unless the result is already a tool error or an `input_required` continuation.
+6. The active wire codec projects and encodes the result for its era.
+7. The client resolves a successful/tool-error result, while protocol, SDK, and transport failures follow throwing/rejection paths.
+
+The [repository analysis](/research/model-context-protocol/repositories/) preserves verified paths, observed failure conditions, and modification exercises.
+
+</DeepDive>
+
+## Alternatives and decision guide
+
+| Approach | Prefer it when | What MCP adds | What MCP costs |
+| --- | --- | --- | --- |
+| Direct provider tool definitions | One application and model provider own every integration | Portability and independent servers | Another protocol/lifecycle boundary |
+| REST/OpenAPI client | Deterministic code calls a known service | AI-oriented discovery and shared primitives | REST may be simpler for fixed calls |
+| Bespoke plugin contract | You control every client and need specialized semantics | Shared SDKs and portable capability providers | Bespoke behavior may not map cleanly |
+| Queue/workflow engine | Durable async execution and retry are the central problem | A standard way to expose the workflow to AI hosts | MCP core does not supply durable execution |
+
+Do **not** add MCP merely to call an internal function in the same process. Use it when the integration boundary, multiple hosts, independent deployment, or standardized discovery earns its operational cost.
+
+## Complete research access
+
+The concise page above is not the complete evidence record. These pages are rendered directly from the original Markdown in `docs/model-context-protocol/`:
+
+- [Main research lesson](/research/model-context-protocol/) — architecture, protocol eras, security, production engineering, alternatives, and limitations
+- [Implementation guide](/research/model-context-protocol/implementation/) — tested server/client, realistic note retrieval, production extension, common errors
+- [Repository analysis](/research/model-context-protocol/repositories/) — pinned source paths and end-to-end trace
+- [Exercises and projects](/research/model-context-protocol/exercises/) — beginner through advanced builds and source-reading work
+- [Revision guide](/research/model-context-protocol/revision/) — six levels of questions plus a transfer challenge
+- [Research plan](/research/model-context-protocol/research-plan/) — scope, questions, evidence, and coverage decisions
+- [Source ledger](/research/model-context-protocol/sources/) — versions, inspection status, findings, and limitations for every source
+
+## Test yourself
+
+<div id="test-yourself"></div>
+
+<p className="learning-kicker">Level 4 · Active recall</p>
+
+<KnowledgeCheck
+  topicId="model-context-protocol"
+  questionId="boundary"
+  category="understanding"
+  prompt="Why is MCP an integration protocol rather than an agent framework, and which responsibilities stay with the host?"
+  answer="MCP standardizes capability discovery, invocation, results, and lifecycle between a host-side client and server. The host still owns model selection and orchestration, user experience, consent, server trust, policy, and what server output enters model context."
+  misconception="Calling a server through a typed protocol does not make the server trusted or the model an authorization authority."
+  reviewHref="#the-problem-mcp-solves"
+/>
+
+<KnowledgeCheck
+  topicId="model-context-protocol"
+  questionId="tool-flow"
+  category="prediction"
+  prompt="A client calls a tool with an argument that violates its declared input schema. Which code should run, and which failure surface should the client observe?"
+  answer="The server should reject the input before the business handler runs. In the inspected high-level SDK path, validation failure becomes a protocol-invalid-params condition handled as a readable tool error at the primitive layer; it is not a transport failure."
+  misconception="Schema validation happens at the server boundary; it does not replace the domain's authorization and invariant checks."
+  reviewHref="#a-tool-call-reconstructed"
+/>
+
+<KnowledgeCheck
+  topicId="model-context-protocol"
+  questionId="ambiguous-write"
+  category="debugging"
+  prompt="An invoice tool times out after the downstream billing API accepted the write. Why is an immediate retry unsafe, and what contract fixes it?"
+  answer="The timeout leaves the commit outcome unknown. A blind retry can create a duplicate invoice. Require a stable idempotency key, atomically store the operation/result, return a durable operation ID, and provide status reconciliation so retries return the original outcome."
+  misconception="A transport timeout does not mean the business transaction rolled back."
+  reviewHref="#failure-model"
+/>
+
+<KnowledgeCheck
+  topicId="model-context-protocol"
+  questionId="protocol-era"
+  category="recall"
+  prompt="Why does installing TypeScript SDK v2 not prove that a connection is using the 2026-07-28 protocol era?"
+  answer="The package supports both modern and legacy behavior. Hand-constructed clients or servers can retain legacy defaults unless the application selects the documented modern serving or negotiation entrypoint, such as auto version negotiation."
+  misconception="Library major version and negotiated wire revision are separate facts."
+  reviewHref="#the-protocol-era-boundary"
+/>
+
+<KnowledgeCheck
+  topicId="model-context-protocol"
+  questionId="remote-architecture"
+  category="architecture"
+  prompt="For three stateless HTTP MCP replicas, which state disappeared and which state still needs durable or shared storage?"
+  answer="Protocol session affinity can disappear because each modern request is self-contained. Business records, authorization data, rate limits, idempotency records, queues, caches, and explicit workflow handles still require durable/shared designs appropriate to their consistency needs."
+  misconception="Stateless protocol serving does not make the application or its dependencies stateless."
+  reviewHref="#security-and-production-engineering"
+/>
+
+<KnowledgeCheck
+  topicId="model-context-protocol"
+  questionId="when-not-to-use"
+  category="trade-offs"
+  prompt="When is a direct function or REST client a better choice than MCP?"
+  answer="Prefer the simpler boundary when one application owns the integration, the call surface is fixed and deterministic, and portability or independent capability providers do not justify another protocol, lifecycle, security, and operational surface."
+  misconception="Standardization is valuable only when the interoperability boundary is real."
+  reviewHref="#alternatives-and-decision-guide"
+/>
+
+## Practice and next steps
+
+Choose one exercise based on what you want to retain:
+
+1. **Mechanism:** build a constrained local `inspect_package` tool and prove invalid paths are rejected before file access.
+2. **Application:** expose tenant-safe note search through Streamable HTTP, deriving workspace identity from verified server context.
+3. **Production:** design a plan/commit/status deployment gateway with idempotency, a queue, approval, and fault-injection tests.
+4. **Source mastery:** add an output-schema violation to the SDK tools example and trace exactly how it reaches the client.
+
+The full milestones and acceptance criteria live in the [original exercises](/research/model-context-protocol/exercises/).
+
+## References
+
+Primary evidence retained from the research package:
+
+- [MCP specification, revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
+- [Transport specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
+- [Authorization specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
+- [2026-07-28 release notes](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
+- [TypeScript SDK v2 documentation](https://ts.sdk.modelcontextprotocol.io/v2/)
+- [Official TypeScript SDK at the inspected commit](https://github.com/modelcontextprotocol/typescript-sdk/tree/60321700871029401a2e3bed8fdf4f02c9ec3331)
+
+For access dates, version boundaries, findings, inspection status, and source limitations, use the [complete source ledger](/research/model-context-protocol/sources/).

@@ -1,0 +1,118 @@
+:root {
+	--learn-blue: #2563eb;
+	--learn-green: #059669;
+	--learn-amber: #d97706;
+	--learn-red: #dc2626;
+	--learn-purple: #7c3aed;
+	--learn-surface: color-mix(in srgb, var(--sl-color-bg) 92%, var(--sl-color-accent) 8%);
+	--learn-border: color-mix(in srgb, var(--sl-color-gray-5) 78%, transparent);
+	--learn-shadow: 0 16px 40px color-mix(in srgb, var(--sl-color-black) 9%, transparent);
+	--sl-content-width: 56rem;
+}
+
+:root[data-theme='dark'] {
+	--learn-blue: #60a5fa;
+	--learn-green: #34d399;
+	--learn-amber: #fbbf24;
+	--learn-red: #f87171;
+	--learn-purple: #a78bfa;
+	--learn-shadow: 0 18px 48px rgb(0 0 0 / 30%);
+}
+
+.learning-kicker {
+	margin: 0 0 0.35rem;
+	color: var(--sl-color-accent-high);
+	font-size: 0.72rem;
+	font-weight: 800;
+	letter-spacing: 0.13em;
+	text-transform: uppercase;
+}
+
+.learning-panel {
+	border: 1px solid var(--learn-border);
+	border-radius: 1rem;
+	background: var(--learn-surface);
+	box-shadow: var(--learn-shadow);
+}
+
+.learning-panel :where(h2, h3, p, ul, ol) {
+	margin-block-start: 0;
+}
+
+.learning-meta-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.learning-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	border: 1px solid var(--learn-border);
+	border-radius: 999px;
+	padding: 0.25rem 0.65rem;
+	background: var(--sl-color-bg);
+	color: var(--sl-color-gray-2);
+	font-size: 0.78rem;
+	font-weight: 700;
+}
+
+.learning-chip[data-tone='blue'] { color: var(--learn-blue); }
+.learning-chip[data-tone='green'] { color: var(--learn-green); }
+.learning-chip[data-tone='amber'] { color: var(--learn-amber); }
+.learning-chip[data-tone='red'] { color: var(--learn-red); }
+.learning-chip[data-tone='purple'] { color: var(--learn-purple); }
+
+.learning-action {
+	border: 1px solid var(--sl-color-accent);
+	border-radius: 0.65rem;
+	padding: 0.48rem 0.78rem;
+	background: transparent;
+	color: var(--sl-color-accent-high);
+	font: inherit;
+	font-size: 0.86rem;
+	font-weight: 750;
+	cursor: pointer;
+}
+
+.learning-action:hover,
+.learning-action:focus-visible {
+	background: var(--sl-color-accent);
+	color: var(--sl-color-black);
+}
+
+.learning-action:focus-visible,
+.learning-interactive:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+	outline-offset: 3px;
+}
+
+.research-source > h1:first-child {
+	display: none;
+}
+
+.research-source-banner {
+	margin-bottom: 1.25rem;
+	border-left: 4px solid var(--learn-purple);
+	border-radius: 0.65rem;
+	padding: 0.85rem 1rem;
+	background: color-mix(in srgb, var(--learn-purple) 10%, var(--sl-color-bg));
+}
+
+@media (max-width: 50rem) {
+	:root {
+		--learn-shadow: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		scroll-behavior: auto !important;
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

@@ -1,0 +1,122 @@
+---
+interface TimelineStep {
+	title: string;
+	actor?: string;
+	detail: string;
+	result?: string;
+}
+
+interface Props {
+	title: string;
+	question: string;
+	steps: TimelineStep[];
+}
+
+const { title, question, steps } = Astro.props;
+---
+
+<section class="execution-timeline learning-panel not-content" data-execution-timeline aria-label={title}>
+	<header>
+		<div>
+			<p class="learning-kicker">Execution timeline</p>
+			<h3>{title}</h3>
+		</div>
+		<button type="button" class="learning-action" data-play aria-label={`Play ${title}`}>Play flow</button>
+	</header>
+	<p class="question">{question}</p>
+	<ol>
+		{steps.map((step, index) => (
+			<li>
+				<button type="button" class="step learning-interactive" data-step={index} aria-pressed={index === 0 ? 'true' : 'false'}>
+					<span class="number">{String(index + 1).padStart(2, '0')}</span>
+					<span class="step-copy">
+						{step.actor && <small>{step.actor}</small>}
+						<strong>{step.title}</strong>
+						<span>{step.detail}</span>
+						{step.result && <em>{step.result}</em>}
+					</span>
+				</button>
+			</li>
+		))}
+	</ol>
+</section>
+
+<script>
+	function wireTimelines() {
+		document.querySelectorAll('[data-execution-timeline]').forEach((root) => {
+			if (!(root instanceof HTMLElement) || root.dataset.wired === 'true') return;
+			root.dataset.wired = 'true';
+			const steps = [...root.querySelectorAll('[data-step]')];
+			let timer;
+			const show = (index) => steps.forEach((step, position) => step.setAttribute('aria-pressed', String(position <= index)));
+			steps.forEach((step, index) => step.addEventListener('click', () => show(index)));
+			root.querySelector('[data-play]')?.addEventListener('click', () => {
+				window.clearInterval(timer);
+				let index = -1;
+				show(index);
+				timer = window.setInterval(() => {
+					index += 1;
+					show(index);
+					if (index >= steps.length - 1) window.clearInterval(timer);
+				}, 720);
+			});
+		});
+	}
+
+	document.addEventListener('astro:page-load', wireTimelines);
+	wireTimelines();
+</script>
+
+<style>
+	.execution-timeline { margin: 1.35rem 0; padding: 1.1rem; }
+	header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+	header h3 { margin: 0; font-size: 1.12rem; }
+	.question { margin: 0.45rem 0 1rem; color: var(--sl-color-gray-2); font-size: 0.88rem; }
+	ol { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+	li { position: relative; }
+	li:not(:last-child)::after {
+		position: absolute;
+		z-index: 0;
+		left: 1.16rem;
+		top: calc(100% - 0.05rem);
+		width: 2px;
+		height: 0.65rem;
+		background: var(--learn-border);
+		content: '';
+	}
+	.step {
+		position: relative;
+		z-index: 1;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.8rem;
+		width: 100%;
+		border: 1px solid var(--learn-border);
+		border-radius: 0.75rem;
+		padding: 0.75rem;
+		background: var(--sl-color-bg);
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		opacity: 0.57;
+	}
+	.step[aria-pressed='true'] { border-color: color-mix(in srgb, var(--learn-blue) 70%, var(--learn-border)); opacity: 1; }
+	.number {
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 999px;
+		background: var(--sl-color-gray-6);
+		color: var(--sl-color-gray-2);
+		font-size: 0.75rem;
+		font-weight: 850;
+	}
+	.step[aria-pressed='true'] .number { background: var(--learn-blue); color: white; }
+	.step-copy { display: grid; gap: 0.2rem; }
+	.step-copy small { color: var(--learn-purple); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+	.step-copy strong { font-size: 0.94rem; }
+	.step-copy > span { color: var(--sl-color-gray-2); font-size: 0.86rem; line-height: 1.45; }
+	.step-copy em { color: var(--learn-green); font-size: 0.78rem; font-style: normal; font-weight: 700; }
+</style>

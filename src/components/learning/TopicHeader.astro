@@ -1,0 +1,55 @@
+---
+interface Relation {
+	type: string;
+	label: string;
+	href: string;
+}
+
+interface Props {
+	category: string;
+	difficulty: string;
+	version: string;
+	prerequisites: string[];
+	relations?: Relation[];
+	researchHref: string;
+}
+
+const { category, difficulty, version, prerequisites, relations = [], researchHref } = Astro.props;
+---
+
+<div class="topic-header not-content">
+	<div class="learning-meta-row">
+		<span class="learning-chip" data-tone="blue">{category}</span>
+		<span class="learning-chip" data-tone="purple">{difficulty}</span>
+		<span class="learning-chip" data-tone="green">{version}</span>
+	</div>
+	<div class="topic-details">
+		<div>
+			<strong>Prerequisites</strong>
+			<span>{prerequisites.join(' · ')}</span>
+		</div>
+		<div>
+			<strong>Source of truth</strong>
+			<a href={researchHref}>Open original research →</a>
+		</div>
+	</div>
+	{relations.length > 0 && (
+		<nav aria-label="Related knowledge">
+			{relations.map((relation) => <a href={relation.href}><small>{relation.type}</small>{relation.label}</a>)}
+		</nav>
+	)}
+</div>
+
+<style>
+	.topic-header { display: grid; gap: 0.8rem; margin: 0.8rem 0 1.25rem; }
+	.topic-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+	.topic-details > div { display: grid; gap: 0.15rem; border-left: 3px solid var(--learn-border); padding-left: 0.7rem; }
+	.topic-details strong { font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase; }
+	.topic-details span,
+	.topic-details a { color: var(--sl-color-gray-2); font-size: 0.82rem; }
+	nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+	nav a { display: grid; gap: 0.08rem; border: 1px solid var(--learn-border); border-radius: 0.7rem; padding: 0.45rem 0.65rem; color: inherit; font-size: 0.8rem; text-decoration: none; }
+	nav a:hover { border-color: var(--sl-color-accent); }
+	nav small { color: var(--sl-color-gray-3); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+	@media (max-width: 40rem) { .topic-details { grid-template-columns: 1fr; } }
+</style>

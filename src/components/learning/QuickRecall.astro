@@ -1,0 +1,144 @@
+---
+interface Props {
+	id?: string;
+	definition: string;
+	problem: string;
+	mentalModel: string;
+	takeaways: string[];
+	whenToUse: string;
+}
+
+const {
+	id = 'quick-recall',
+	definition,
+	problem,
+	mentalModel,
+	takeaways,
+	whenToUse,
+} = Astro.props;
+const hasVisual = Astro.slots.has('visual');
+---
+
+<section class="quick-recall learning-panel not-content" aria-labelledby={`${id}-title`}>
+	<header>
+		<p class="learning-kicker">Level 1 · 30-second recall</p>
+		<h2 id={`${id}-title`}>Quick recall</h2>
+		<p class="definition">{definition}</p>
+	</header>
+
+	<div class="recall-grid">
+		<div class="recall-item problem">
+			<span aria-hidden="true">◎</span>
+			<div>
+				<h3>The problem</h3>
+				<p>{problem}</p>
+			</div>
+		</div>
+		<div class="recall-item model">
+			<span aria-hidden="true">◇</span>
+			<div>
+				<h3>Mental model</h3>
+				<p>{mentalModel}</p>
+			</div>
+		</div>
+		<div class="recall-item use">
+			<span aria-hidden="true">→</span>
+			<div>
+				<h3>Use it when</h3>
+				<p>{whenToUse}</p>
+			</div>
+		</div>
+	</div>
+
+	{hasVisual && <div class="recall-visual"><slot name="visual" /></div>}
+
+	<div class="takeaways">
+		<h3>Keep these three</h3>
+		<ol>
+			{takeaways.slice(0, 3).map((takeaway) => <li>{takeaway}</li>)}
+		</ol>
+	</div>
+</section>
+
+<style>
+	.quick-recall {
+		position: relative;
+		isolation: isolate;
+		overflow: hidden;
+		margin: 1.4rem 0 2rem;
+		padding: clamp(1.15rem, 3vw, 1.8rem);
+	}
+	.quick-recall::before {
+		position: absolute;
+		z-index: -1;
+		inset: 0 auto auto 0;
+		width: 13rem;
+		height: 13rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--learn-blue) 14%, transparent);
+		filter: blur(28px);
+		content: '';
+		transform: translate(-35%, -48%);
+	}
+	header h2 {
+		margin: 0;
+		font-size: clamp(1.55rem, 4vw, 2.2rem);
+		letter-spacing: -0.035em;
+	}
+	.definition {
+		max-width: 56rem;
+		margin: 0.6rem 0 1.25rem;
+		color: var(--sl-color-gray-1);
+		font-size: clamp(1rem, 2vw, 1.18rem);
+		line-height: 1.6;
+	}
+	.recall-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+	.recall-item {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.65rem;
+		border: 1px solid var(--learn-border);
+		border-top: 3px solid var(--learn-blue);
+		border-radius: 0.8rem;
+		padding: 0.9rem;
+		background: color-mix(in srgb, var(--sl-color-bg) 88%, transparent);
+	}
+	.recall-item.model { border-top-color: var(--learn-purple); }
+	.recall-item.use { border-top-color: var(--learn-green); }
+	.recall-item > span {
+		color: var(--sl-color-accent-high);
+		font-size: 1.2rem;
+		font-weight: 900;
+	}
+	.recall-item h3,
+	.takeaways h3 {
+		margin: 0 0 0.3rem;
+		font-size: 0.8rem;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+	}
+	.recall-item p { margin: 0; font-size: 0.9rem; line-height: 1.5; }
+	.recall-visual { margin-top: 1rem; }
+	.takeaways {
+		margin-top: 1rem;
+		border-radius: 0.8rem;
+		padding: 1rem;
+		background: color-mix(in srgb, var(--learn-blue) 8%, var(--sl-color-bg));
+	}
+	.takeaways ol {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.65rem 1.25rem;
+		margin: 0.65rem 0 0;
+		padding-left: 1.3rem;
+	}
+	.takeaways li { padding-left: 0.2rem; font-size: 0.9rem; line-height: 1.5; }
+	@media (max-width: 46rem) {
+		.recall-grid,
+		.takeaways ol { grid-template-columns: 1fr; }
+	}
+</style>

@@ -17,12 +17,17 @@ import starlightLlmsTxt from 'starlight-llms-txt';
 import starlightMdTxt from 'starlight-md-txt';
 import starlightCodeblockFullscreen from 'starlight-codeblock-fullscreen';
 import starlightFullviewMode from 'starlight-fullview-mode';
+import rewriteLocalMarkdownLinks from './src/markdown/rewrite-local-markdown-links.mjs';
+import browserGlobShim from './src/integrations/browser-glob-shim.mjs';
 
 // https://astro.build/config
 export default defineConfig({
 	site: 'http://localhost:4321',
+	vite: {
+		plugins: [browserGlobShim()],
+	},
 	markdown: {
-		processor: satteri(),
+		processor: satteri({ hastPlugins: [rewriteLocalMarkdownLinks] }),
 	},
 	integrations: [
 		mermaid({ theme: 'forest', autoTheme: true }),
@@ -30,11 +35,18 @@ export default defineConfig({
 		starlight({
 			title: 'My Learning Hub',
 			description: 'All my learnings in one place — software, AI, mobile, system design, DevOps, UI, soft skills & tools.',
+			customCss: ['./src/styles/learning.css'],
+			markdown: {
+				processedDirs: ['./docs/'],
+			},
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/withastro/starlight' }],
 			components: {
 				// Hide the built-in topics list — homepage is the only switcher.
 				// Per-topic sidebar filtering from the plugin still applies.
 				Sidebar: './src/components/Sidebar.astro',
+				// Compose heading badges and quiz progress through one ToC implementation.
+				TableOfContents: './src/components/overrides/TableOfContents.astro',
+				MobileTableOfContents: './src/components/overrides/MobileTableOfContents.astro',
 			},
 			plugins: [
 				starlightSidebarTopics(
@@ -88,7 +100,17 @@ export default defineConfig({
 							items: [{ autogenerate: { directory: 'tools' } }],
 						},
 					],
-					{ exclude: ['/', '/tags', '/tags/**/*', '/zen-mode', '/zen-mode/**/*'] },
+					{
+						exclude: [
+							'/',
+							'/tags',
+							'/tags/**/*',
+							'/zen-mode',
+							'/zen-mode/**/*',
+							'/research',
+							'/research/**/*',
+						],
+					},
 				),
 				starlightImageZoom(),
 				starlightSiteGraph(),
@@ -97,7 +119,14 @@ export default defineConfig({
 				starlightTagsPlugin(),
 				starlightHeadingBadges(),
 				starlightQuiz(),
-				starlightLinksValidator(),
+				starlightLinksValidator({
+					// Custom research pages are verified by the visual harness and Astro build.
+					// The plugin cannot resolve custom-page routes. DeepLearn validation checks
+					// source-file targets and the Astro renderer publishes extensionless URLs.
+					exclude: ({ file, link }) =>
+						link.startsWith('/research/') ||
+						(/[\\/]docs[\\/]/.test(file) && !link.startsWith('/') && !link.startsWith('#')),
+				}),
 				starlightLlmsTxt(),
 				starlightMdTxt(),
 				starlightCodeblockFullscreen(),

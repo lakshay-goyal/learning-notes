@@ -1,0 +1,54 @@
+---
+interface Annotation {
+	lines: string;
+	title: string;
+	explanation: string;
+}
+
+interface Props {
+	title: string;
+	purpose: string;
+	annotations: Annotation[];
+	expected?: string;
+}
+
+const { title, purpose, annotations, expected } = Astro.props;
+---
+
+<section class="code-walkthrough learning-panel not-content" aria-label={`Code walkthrough: ${title}`}>
+	<header>
+		<p class="learning-kicker">Annotated code</p>
+		<h3>{title}</h3>
+		<p>{purpose}</p>
+	</header>
+	<div class="code-slot"><slot /></div>
+	<ol class="annotations">
+		{annotations.map((annotation, index) => (
+			<li>
+				<span class="annotation-number">{index + 1}</span>
+				<div>
+					<p class="line-label">Lines {annotation.lines}</p>
+					<h4>{annotation.title}</h4>
+					<p>{annotation.explanation}</p>
+				</div>
+			</li>
+		))}
+	</ol>
+	{expected && <p class="expected"><strong>Expected behavior:</strong> {expected}</p>}
+</section>
+
+<style>
+	.code-walkthrough { margin: 1.35rem 0; overflow: hidden; }
+	header { padding: 1.1rem 1.1rem 0; }
+	header h3 { margin: 0; font-size: 1.12rem; }
+	header > p:last-child { margin: 0.35rem 0 0; color: var(--sl-color-gray-2); font-size: 0.88rem; }
+	.code-slot { padding: 0.2rem 1rem; }
+	.annotations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; margin: 0; padding: 0 1rem 1rem; list-style: none; }
+	.annotations li { display: grid; grid-template-columns: auto 1fr; gap: 0.65rem; border: 1px solid var(--learn-border); border-radius: 0.75rem; padding: 0.75rem; background: var(--sl-color-bg); }
+	.annotation-number { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 0.5rem; background: color-mix(in srgb, var(--learn-green) 14%, var(--sl-color-bg)); color: var(--learn-green); font-size: 0.78rem; font-weight: 850; }
+	.line-label { margin: 0; color: var(--learn-green); font-size: 0.67rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+	h4 { margin: 0.12rem 0 0.25rem; font-size: 0.9rem; }
+	.annotations li p:last-child { margin: 0; color: var(--sl-color-gray-2); font-size: 0.82rem; line-height: 1.45; }
+	.expected { margin: 0; border-top: 1px solid var(--learn-border); padding: 0.85rem 1.1rem; background: color-mix(in srgb, var(--learn-green) 8%, var(--sl-color-bg)); font-size: 0.86rem; }
+	@media (max-width: 44rem) { .annotations { grid-template-columns: 1fr; } }
+</style>

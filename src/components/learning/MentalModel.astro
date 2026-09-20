@@ -1,0 +1,47 @@
+---
+interface Props {
+	title: string;
+	model: string;
+	boundary: string;
+	icon?: string;
+}
+
+const { title, model, boundary, icon = '◇' } = Astro.props;
+---
+
+<aside class="mental-model not-content" aria-label={`Mental model: ${title}`}>
+	<div class="model-icon" aria-hidden="true">{icon}</div>
+	<div>
+		<p class="learning-kicker">Mental model</p>
+		<h3>{title}</h3>
+		<p class="model-copy">{model}</p>
+		<p class="boundary"><strong>Where the analogy stops:</strong> {boundary}</p>
+	</div>
+</aside>
+
+<style>
+	.mental-model {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1rem;
+		margin: 1.25rem 0;
+		border: 1px solid color-mix(in srgb, var(--learn-purple) 32%, var(--learn-border));
+		border-radius: 1rem;
+		padding: 1rem 1.15rem;
+		background: linear-gradient(135deg, color-mix(in srgb, var(--learn-purple) 11%, var(--sl-color-bg)), var(--sl-color-bg));
+	}
+	.model-icon {
+		display: grid;
+		place-items: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.8rem;
+		background: color-mix(in srgb, var(--learn-purple) 18%, var(--sl-color-bg));
+		color: var(--learn-purple);
+		font-size: 1.35rem;
+		font-weight: 900;
+	}
+	h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+	.model-copy { margin: 0; color: var(--sl-color-gray-1); line-height: 1.58; }
+	.boundary { margin: 0.65rem 0 0; color: var(--sl-color-gray-2); font-size: 0.84rem; line-height: 1.5; }
+</style>

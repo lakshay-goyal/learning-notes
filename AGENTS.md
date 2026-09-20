@@ -29,3 +29,12 @@ Consult these guides before working on related tasks:
 - Read `.doty/config.json` and the mode-specific methodology referenced by the skill before starting a learning workflow.
 - Use `node scripts/deep-learn.mjs` for topic scaffolding, knowledge-index updates, and deterministic validation. Semantic and factual validation still require agent review.
 - Preserve existing topic material when extending it. Research only missing or stale areas unless the user requests a complete refresh, and record meaningful changes in the topic README.
+
+## DeepLearn Visual harness
+
+- For requests to publish, visualize, revise, connect, or update completed DeepLearn research in the Astro application, use the repository-local `deep-learn-visual` skill in `.agents/skills/deep-learn-visual/`.
+- Treat `docs/` as the research source of truth. Learning pages in `src/content/docs/` are a maintained presentation layer and must link to the corresponding `/research/` routes.
+- Read `.agent/config.json` and the canonical skill/rules referenced by the adapter before changing visual learning content.
+- Use `node scripts/deep-learn-visual.mjs inspect <slug>` before transforming a topic and `node scripts/deep-learn-visual.mjs validate <slug> --strict` before claiming it is complete.
+- Preserve stable topic IDs and routes during incremental updates. Update `.agent/coverage/<slug>.md` whenever source or destination sections change.
+- Keep progress data separate from research. The current local-only revision MVP stores learner state in browser `localStorage`; do not describe it as cross-device sync.

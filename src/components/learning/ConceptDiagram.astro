@@ -1,0 +1,192 @@
+---
+interface DiagramNode {
+	id: string;
+	label: string;
+	detail: string;
+	x: number;
+	y: number;
+	tone?: 'blue' | 'green' | 'amber' | 'red' | 'purple';
+}
+
+interface DiagramEdge {
+	from: string;
+	to: string;
+	label?: string;
+	dashed?: boolean;
+}
+
+interface Props {
+	id: string;
+	title: string;
+	question: string;
+	nodes: DiagramNode[];
+	edges: DiagramEdge[];
+}
+
+const { id, title, question, nodes, edges } = Astro.props;
+const byId = new Map(nodes.map((node) => [node.id, node]));
+const markerId = `${id}-arrow`;
+---
+
+<figure class="concept-diagram learning-panel not-content" data-concept-diagram>
+	<figcaption>
+		<div>
+			<p class="learning-kicker">Visual explanation</p>
+			<h3>{title}</h3>
+		</div>
+		<p class="question">{question}</p>
+	</figcaption>
+
+	<div class="viewport" tabindex="0" aria-label={`${title}. Scroll horizontally on smaller screens.`}>
+		<div class="canvas">
+			<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+				<defs>
+					<marker id={markerId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+						<path d="M 0 1 L 9 5 L 0 9 z"></path>
+					</marker>
+				</defs>
+				{edges.map((edge) => {
+					const from = byId.get(edge.from);
+					const to = byId.get(edge.to);
+					if (!from || !to) return null;
+					const labelX = (from.x + to.x) / 2;
+					const labelY = (from.y + to.y) / 2 - 2;
+					return (
+						<g class:list={{ dashed: edge.dashed }}>
+							<line x1={from.x} y1={from.y} x2={to.x} y2={to.y} marker-end={`url(#${markerId})`} />
+							{edge.label && <text x={labelX} y={labelY}>{edge.label}</text>}
+						</g>
+					);
+				})}
+			</svg>
+			{nodes.map((node, index) => (
+				<button
+					type="button"
+					class="node learning-interactive"
+					data-node={node.id}
+					data-detail={node.detail}
+					data-tone={node.tone ?? 'blue'}
+					aria-pressed={index === 0 ? 'true' : 'false'}
+					style={`left:${node.x}%;top:${node.y}%`}
+				>
+					<span>{node.label}</span>
+				</button>
+			))}
+		</div>
+	</div>
+
+	<div class="diagram-detail" aria-live="polite">
+		<strong>{nodes[0]?.label}</strong>
+		<span>{nodes[0]?.detail}</span>
+	</div>
+	<ol class="sr-structure">
+		{nodes.map((node) => <li><strong>{node.label}:</strong> {node.detail}</li>)}
+	</ol>
+</figure>
+
+<script>
+	function wireConceptDiagrams() {
+		document.querySelectorAll('[data-concept-diagram]').forEach((root) => {
+			if (!(root instanceof HTMLElement) || root.dataset.wired === 'true') return;
+			root.dataset.wired = 'true';
+			const detail = root.querySelector('.diagram-detail');
+			const nodes = [...root.querySelectorAll('[data-node]')];
+			nodes.forEach((node) => {
+				node.addEventListener('click', () => {
+					nodes.forEach((item) => item.setAttribute('aria-pressed', String(item === node)));
+					if (detail instanceof HTMLElement && node instanceof HTMLElement) {
+						detail.innerHTML = '';
+						const strong = document.createElement('strong');
+						strong.textContent = node.textContent?.trim() ?? '';
+						const span = document.createElement('span');
+						span.textContent = node.dataset.detail ?? '';
+						detail.append(strong, span);
+					}
+				});
+			});
+		});
+	}
+
+	document.addEventListener('astro:page-load', wireConceptDiagrams);
+	wireConceptDiagrams();
+</script>
+
+<style>
+	.concept-diagram { margin: 1.35rem 0; overflow: hidden; }
+	figcaption {
+		display: flex;
+		align-items: end;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1rem 1.1rem 0.2rem;
+	}
+	figcaption h3 { margin: 0; font-size: 1.1rem; }
+	.question { max-width: 28rem; margin: 0; color: var(--sl-color-gray-2); font-size: 0.84rem; text-align: right; }
+	.viewport { overflow-x: auto; padding: 0.5rem 1rem 0; }
+	.canvas { position: relative; min-width: 690px; height: 340px; }
+	svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+	line { stroke: var(--sl-color-gray-4); stroke-width: 0.48; vector-effect: non-scaling-stroke; }
+	.dashed line { stroke-dasharray: 2.2 1.8; }
+	path { fill: var(--sl-color-gray-4); }
+	text { fill: var(--sl-color-gray-3); font-size: 2.35px; font-weight: 650; text-anchor: middle; }
+	.node {
+		position: absolute;
+		width: 9.7rem;
+		min-height: 3.45rem;
+		transform: translate(-50%, -50%);
+		border: 1px solid var(--learn-blue);
+		border-radius: 0.8rem;
+		padding: 0.6rem 0.75rem;
+		background: color-mix(in srgb, var(--learn-blue) 9%, var(--sl-color-bg));
+		color: var(--sl-color-gray-1);
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 760;
+		line-height: 1.25;
+		cursor: pointer;
+		box-shadow: 0 7px 18px rgb(0 0 0 / 9%);
+	}
+	.node[data-tone='green'] { border-color: var(--learn-green); background: color-mix(in srgb, var(--learn-green) 9%, var(--sl-color-bg)); }
+	.node[data-tone='amber'] { border-color: var(--learn-amber); background: color-mix(in srgb, var(--learn-amber) 9%, var(--sl-color-bg)); }
+	.node[data-tone='red'] { border-color: var(--learn-red); background: color-mix(in srgb, var(--learn-red) 9%, var(--sl-color-bg)); }
+	.node[data-tone='purple'] { border-color: var(--learn-purple); background: color-mix(in srgb, var(--learn-purple) 9%, var(--sl-color-bg)); }
+	.node:hover,
+	.node[aria-pressed='true'] { transform: translate(-50%, -50%) scale(1.045); box-shadow: 0 10px 25px rgb(0 0 0 / 16%); }
+	.node[aria-pressed='true']::after {
+		position: absolute;
+		right: 0.5rem;
+		bottom: 0.28rem;
+		color: var(--sl-color-accent-high);
+		content: '●';
+		font-size: 0.48rem;
+	}
+	.diagram-detail {
+		display: grid;
+		grid-template-columns: minmax(7rem, auto) 1fr;
+		gap: 0.8rem;
+		min-height: 3.65rem;
+		border-top: 1px solid var(--learn-border);
+		padding: 0.9rem 1.1rem;
+		background: color-mix(in srgb, var(--learn-purple) 6%, var(--sl-color-bg));
+		font-size: 0.88rem;
+		line-height: 1.55;
+	}
+	.diagram-detail strong { color: var(--learn-purple); }
+	.sr-structure {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+	@media (max-width: 42rem) {
+		figcaption { align-items: start; flex-direction: column; }
+		.question { text-align: left; }
+		svg text { display: none; }
+		.diagram-detail { grid-template-columns: 1fr; gap: 0.25rem; }
+	}
+</style>

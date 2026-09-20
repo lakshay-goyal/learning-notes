@@ -1,0 +1,55 @@
+---
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+export async function getStaticPaths() {
+	const entries = await getCollection('research');
+	return entries.map((entry) => {
+		const parts = entry.id.split('/');
+		const leaf = parts.at(-1)?.toLowerCase();
+		const routeParts = leaf === 'readme' ? parts.slice(0, -1) : parts;
+		return {
+			params: { slug: routeParts.join('/') },
+			props: { entry },
+		};
+	});
+}
+
+interface Props {
+	entry: CollectionEntry<'research'>;
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const firstHeading = entry.body?.match(/^#\s+(.+)$/m)?.[1];
+const title = entry.data.title ?? firstHeading ?? entry.id.split('/').at(-1)?.replaceAll('-', ' ') ?? 'Research';
+const topicSlug = entry.id.split('/')[0];
+const learningHref = topicSlug === 'model-context-protocol' ? '/ai-engineering/model-context-protocol/' : undefined;
+const sourcePath = entry.id.includes('/') ? `docs/${entry.id}.md` : `docs/${entry.id}/README.md`;
+---
+
+<StarlightPage
+	frontmatter={{
+		title: `Research · ${title}`,
+		description: `Original DeepLearn research source: ${title}`,
+		pagefind: true,
+	}}
+	headings={headings}
+>
+	<div class="research-source-banner not-content">
+		<strong>Original research source</strong>
+		<p>
+			This page is rendered directly from <code>{sourcePath}</code>. It remains the source of truth;
+			 the visual lesson is a maintained presentation layer.
+		</p>
+		{learningHref && <a href={learningHref}>Open the visual learning experience →</a>}
+	</div>
+	<div class="research-source sl-markdown-content">
+		<Content />
+	</div>
+</StarlightPage>
+
+<style>
+	.research-source-banner p { margin: 0.35rem 0; color: var(--sl-color-gray-2); font-size: 0.88rem; }
+	.research-source-banner a { font-size: 0.84rem; font-weight: 750; }
+</style>

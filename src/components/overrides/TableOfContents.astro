@@ -1,0 +1,13 @@
+---
+import HeadingBadgesTableOfContents from 'starlight-heading-badges/components/HeadingBadgesTableOfContents.astro';
+import { QuizProgress } from 'starlight-quiz/components';
+import ViewModesTableOfContents from 'starlight-view-modes/components/TableOfContents.astro';
+
+const quiz = Astro.locals.starlightQuiz as { progressPosition?: 'top' | 'bottom' } | undefined;
+const position = quiz?.progressPosition === 'bottom' ? 'bottom' : 'top';
+---
+
+{position === 'top' && <QuizProgress class="sl-quiz-progress--toc" />}
+<HeadingBadgesTableOfContents />
+{position === 'bottom' && <QuizProgress class="sl-quiz-progress--toc" />}
+<ViewModesTableOfContents />

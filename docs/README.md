@@ -11,6 +11,8 @@ This directory is the Markdown source of truth for DeepLearn research packages. 
 
 Ask Codex to “Use DeepLearn to teach me …”, “go deeper into …”, or “review my understanding of …” to run the agent-driven workflow.
 
+To publish validated research as a visual, retention-focused Astro lesson, ask Codex to “Use DeepLearn Visual to publish my … research.” The visual layer preserves these files as the source of truth, records section-level coverage in `.agent/coverage/`, and exposes the original Markdown under `/research/<topic>/`.
+
 ## Topics
 
 <!-- DEEP_LEARN_INDEX_START -->

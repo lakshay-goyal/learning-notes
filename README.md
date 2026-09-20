@@ -1,49 +1,59 @@
-# Starlight Starter Kit: Basics
+# Engineering knowledge and retention system
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+This Astro + Starlight application has two complementary layers:
 
+- **DeepLearn** researches technical topics and preserves the complete, source-backed Markdown package in `docs/`.
+- **DeepLearn Visual** turns that package into layered learning pages in `src/content/docs/` with diagrams, code walkthroughs, active recall, related knowledge, and browser-local revision scheduling.
+
+Research remains the source of truth. Published learning pages link back to the exact research material and are checked against a section-level coverage map in `.agent/coverage/`.
+
+## Use the harnesses
+
+Ask the coding agent:
+
+> Use DeepLearn Visual to publish my MCP research.
+
+The discoverable entry point is `.agents/skills/deep-learn-visual/`; the canonical methodology and supporting skills live in `.agent/`. See [the DeepLearn Visual guide](.agent/README.md) for the workflow, update policy, and validation contract.
+
+Useful commands:
+
+```bash
+# Research validation
+node scripts/deep-learn.mjs validate model-context-protocol --strict
+
+# Visual integration inspection and validation
+node scripts/deep-learn-visual.mjs inspect model-context-protocol
+node scripts/deep-learn-visual.mjs coverage model-context-protocol
+node scripts/deep-learn-visual.mjs validate model-context-protocol --strict
+
+# Repository tests and production build
+npm test
+npm run build
 ```
-npm create astro@latest -- --template starlight
+
+For local development, follow the repository instruction to use Astro's background server:
+
+```bash
+astro dev --background
+astro dev status
+astro dev logs
+astro dev stop
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Content architecture
 
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```text
+docs/                         complete DeepLearn research (source of truth)
+src/content/docs/             visual learning presentation
+src/components/learning/      reusable educational UI
+src/pages/research/           direct rendering of original research
+.agent/                       canonical visual-learning methodology
+.agents/skills/               agent-discovery adapters
+scripts/deep-learn-visual.mjs deterministic integration validator
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+The first complete topic is [Model Context Protocol](src/content/docs/ai-engineering/model-context-protocol/index.mdx). Original research is rendered at `/research/model-context-protocol/` and its child routes.
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+## Progress and privacy
 
-Static assets, like favicons, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+Learning status and review dates are stored in the current browser's `localStorage`. This local MVP does not synchronize across browsers or devices, and no progress is written into research files.

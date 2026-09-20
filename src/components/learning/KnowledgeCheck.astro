@@ -1,0 +1,135 @@
+---
+interface Props {
+	topicId: string;
+	questionId: string;
+	category: 'recall' | 'understanding' | 'prediction' | 'application' | 'debugging' | 'architecture' | 'trade-offs';
+	prompt: string;
+	answer: string;
+	misconception?: string;
+	reviewHref?: string;
+}
+
+const { topicId, questionId, category, prompt, answer, misconception, reviewHref } = Astro.props;
+---
+
+<article
+	class="knowledge-check learning-panel not-content"
+	data-knowledge-check
+	data-topic-id={topicId}
+	data-question-id={questionId}
+>
+	<header>
+		<span class="learning-chip" data-tone="purple">{category}</span>
+		<span class="attempt-status" aria-live="polite">Not reviewed yet</span>
+	</header>
+	<h3>{prompt}</h3>
+	<p class="recall-first">Pause. Say or write your answer before revealing it.</p>
+	<button type="button" class="learning-action reveal" aria-expanded="false">Reveal answer</button>
+	<div class="answer" hidden>
+		<p>{answer}</p>
+		{misconception && <p class="misconception"><strong>Common misconception:</strong> {misconception}</p>}
+		{reviewHref && <a href={reviewHref}>Review the related section →</a>}
+		<fieldset>
+			<legend>How did recall feel?</legend>
+			<div class="ratings">
+				<button type="button" data-rating="forgot">Forgot</button>
+				<button type="button" data-rating="hard">Difficult</button>
+				<button type="button" data-rating="remembered">Remembered</button>
+				<button type="button" data-rating="easy">Easy</button>
+			</div>
+		</fieldset>
+	</div>
+</article>
+
+<script>
+	const STORAGE_KEY = 'deep-learn-visual:v1';
+	const DAY = 86_400_000;
+	const intervals = { forgot: 1, hard: 3, remembered: 7, easy: 21 };
+
+	function readState() {
+		try {
+			return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"topics":{}}');
+		} catch {
+			return { topics: {} };
+		}
+	}
+
+	function wireKnowledgeChecks() {
+		document.querySelectorAll('[data-knowledge-check]').forEach((root) => {
+			if (!(root instanceof HTMLElement) || root.dataset.wired === 'true') return;
+			root.dataset.wired = 'true';
+			const topicId = root.dataset.topicId;
+			const questionId = root.dataset.questionId;
+			if (!topicId || !questionId) return;
+			const reveal = root.querySelector('.reveal');
+			const answer = root.querySelector('.answer');
+			const status = root.querySelector('.attempt-status');
+			const stored = readState().topics?.[topicId]?.questions?.[questionId];
+			if (stored && status) status.textContent = `${stored.attempts} attempt${stored.attempts === 1 ? '' : 's'} · ${stored.rating}`;
+
+			reveal?.addEventListener('click', () => {
+				if (!(answer instanceof HTMLElement)) return;
+				answer.hidden = !answer.hidden;
+				reveal.setAttribute('aria-expanded', String(!answer.hidden));
+				reveal.textContent = answer.hidden ? 'Reveal answer' : 'Hide answer';
+				if (!answer.hidden) answer.querySelector('button')?.focus();
+			});
+
+			root.querySelectorAll('[data-rating]').forEach((button) => {
+				button.addEventListener('click', () => {
+					if (!(button instanceof HTMLElement)) return;
+					const rating = button.dataset.rating;
+					if (!rating || !(rating in intervals)) return;
+					const state = readState();
+					state.topics ??= {};
+					const topic = (state.topics[topicId] ??= { status: 'studying', questions: {} });
+					topic.questions ??= {};
+					const previous = topic.questions[questionId];
+					const now = Date.now();
+					topic.questions[questionId] = {
+						rating,
+						attempts: (previous?.attempts ?? 0) + 1,
+						lastReviewed: new Date(now).toISOString(),
+						nextReview: new Date(now + intervals[rating] * DAY).toISOString(),
+					};
+					topic.lastOpened = new Date(now).toISOString();
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+					root.querySelectorAll('[data-rating]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+					if (status) status.textContent = `Saved · review in ${intervals[rating]} day${intervals[rating] === 1 ? '' : 's'}`;
+					window.dispatchEvent(new CustomEvent('deep-learn-progress'));
+				});
+			});
+		});
+	}
+
+	document.addEventListener('astro:page-load', wireKnowledgeChecks);
+	wireKnowledgeChecks();
+</script>
+
+<style>
+	.knowledge-check { margin: 0.85rem 0; padding: 1rem 1.1rem; box-shadow: none; }
+	header { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; }
+	.attempt-status { color: var(--sl-color-gray-3); font-size: 0.72rem; }
+	h3 { margin: 0.85rem 0 0.35rem; font-size: 1rem; line-height: 1.45; }
+	.recall-first { margin: 0 0 0.85rem; color: var(--sl-color-gray-3); font-size: 0.82rem; }
+	.answer { margin-top: 0.9rem; border-top: 1px solid var(--learn-border); padding-top: 0.9rem; }
+	.answer > p { margin: 0 0 0.7rem; color: var(--sl-color-gray-1); line-height: 1.6; }
+	.answer a { font-size: 0.84rem; font-weight: 700; }
+	.misconception { border-left: 3px solid var(--learn-amber); padding-left: 0.75rem; color: var(--sl-color-gray-2) !important; font-size: 0.84rem; }
+	fieldset { margin: 1rem 0 0; border: 0; padding: 0; }
+	legend { margin-bottom: 0.45rem; font-size: 0.78rem; font-weight: 750; }
+	.ratings { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+	.ratings button {
+		border: 1px solid var(--learn-border);
+		border-radius: 999px;
+		padding: 0.35rem 0.65rem;
+		background: var(--sl-color-bg);
+		color: inherit;
+		font: inherit;
+		font-size: 0.76rem;
+		cursor: pointer;
+	}
+	.ratings button:hover,
+	.ratings button:focus-visible,
+	.ratings button[aria-pressed='true'] { border-color: var(--learn-green); color: var(--learn-green); }
+</style>

@@ -1,0 +1,32 @@
+---
+interface Props {
+	summary: string;
+	kicker?: string;
+	open?: boolean;
+}
+
+const { summary, kicker = 'Level 3 · Deep dive', open = false } = Astro.props;
+---
+
+<details class="deep-dive not-content" open={open}>
+	<summary>
+		<span>
+			<small>{kicker}</small>
+			<strong>{summary}</strong>
+		</span>
+		<span class="toggle" aria-hidden="true">+</span>
+	</summary>
+	<div class="deep-dive-content sl-markdown-content"><slot /></div>
+</details>
+
+<style>
+	.deep-dive { margin: 0.9rem 0; border: 1px solid var(--learn-border); border-radius: 0.9rem; background: var(--sl-color-bg); overflow: clip; }
+	summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.9rem 1rem; cursor: pointer; list-style: none; }
+	summary::-webkit-details-marker { display: none; }
+	summary > span:first-child { display: grid; gap: 0.12rem; }
+	summary small { color: var(--learn-purple); font-size: 0.66rem; font-weight: 850; letter-spacing: 0.09em; text-transform: uppercase; }
+	summary strong { font-size: 0.94rem; }
+	.toggle { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 999px; background: var(--sl-color-gray-6); color: var(--sl-color-gray-2); font-size: 1.1rem; transition: transform 0.18s; }
+	details[open] .toggle { transform: rotate(45deg); }
+	.deep-dive-content { border-top: 1px solid var(--learn-border); padding: 0.35rem 1rem 1rem; }
+</style>
