@@ -1,0 +1,160 @@
+---
+/**
+ * UserFlow — a dynamic, reusable user-flow visual.
+ * Click any step to spotlight it, or press "Walk through" to play the flow.
+ * Stateless: nothing is saved, it resets on every page load.
+ */
+interface FlowStep {
+  icon?: string;
+  title: string;
+  text?: string;
+}
+interface Props {
+  title?: string;
+  steps: FlowStep[];
+}
+const { title, steps } = Astro.props;
+---
+
+<div class="uflow not-content" data-uflow>
+  {
+    title && (
+      <div class="uflow-head">
+        <strong>{title}</strong>
+        <button class="uflow-play" type="button">▶ Walk through</button>
+      </div>
+    )
+  }
+  <ol>
+    {
+      steps.map((s, i) => (
+        <li data-step={i} title="Click to spotlight this step">
+          <span class="dot" aria-hidden="true">{s.icon ?? i + 1}</span>
+          <div class="card">
+            <strong>{s.title}</strong>
+            {s.text && <p>{s.text}</p>}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</div>
+
+<script type="module">
+  document.querySelectorAll('[data-uflow]').forEach((root) => {
+    const items = [...root.querySelectorAll('[data-step]')];
+    const show = (n) => items.forEach((el, k) => el.classList.toggle('on', k <= n));
+    show(items.length - 1);
+    items.forEach((el, k) => el.addEventListener('click', () => show(k)));
+    let timer;
+    root.querySelector('.uflow-play')?.addEventListener('click', () => {
+      clearInterval(timer);
+      let n = -1;
+      show(-1);
+      timer = setInterval(() => {
+        n++;
+        if (n >= items.length) {
+          clearInterval(timer);
+          return;
+        }
+        show(n);
+      }, 900);
+    });
+  });
+</script>
+
+<style>
+  .uflow {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    margin: 1rem 0;
+  }
+  .uflow-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .uflow-play {
+    cursor: pointer;
+    border: 1px solid var(--sl-color-accent);
+    color: var(--sl-color-accent);
+    background: transparent;
+    border-radius: 999px;
+    padding: 0.25rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  .uflow-play:hover {
+    background: var(--sl-color-accent);
+    color: #fff;
+  }
+  .uflow ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .uflow li {
+    display: flex;
+    gap: 0.8rem;
+    position: relative;
+    padding-bottom: 0.9rem;
+    cursor: pointer;
+  }
+  .uflow li:last-child {
+    padding-bottom: 0;
+  }
+  .uflow li::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 34px;
+    bottom: 0;
+    width: 2px;
+    background: var(--sl-color-gray-5);
+  }
+  .uflow li:last-child::before {
+    display: none;
+  }
+  .uflow .dot {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border: 2px solid var(--sl-color-gray-5);
+    background: var(--sl-color-bg);
+    z-index: 1;
+  }
+  .uflow .card {
+    flex: 1;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 10px;
+    padding: 0.55rem 0.8rem;
+    opacity: 0.55;
+    transition:
+      opacity 0.25s,
+      border-color 0.25s;
+  }
+  .uflow .card p {
+    margin: 0.25rem 0 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+  }
+  .uflow li.on .card {
+    opacity: 1;
+    border-color: var(--sl-color-accent);
+  }
+  .uflow li.on .dot {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent);
+    color: #fff;
+  }
+</style>

@@ -1,0 +1,159 @@
+---
+title: Merging branches
+description: Visual guide to git merge — fast-forward, merge commits, conflicts, and the 30-second decision path.
+tags: [visual, beginner, diagrams, quiz]
+---
+
+import { Card, CardGrid, Steps, Aside, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Quiz } from 'starlight-quiz/components';
+import BranchVisual from '../../../../components/visual/BranchVisual.astro';
+import DecisionFlow from '../../../../components/visual/DecisionFlow.astro';
+
+[← Back to Git](/tools/git/)
+
+<Aside type="tip" title="TL;DR">
+`git merge` folds one branch into where you're standing — fast-forward, merge commit, or conflict markers you fix by hand.
+</Aside>
+
+## Two rules that trip everyone up
+
+<CardGrid>
+  <Card title="🌱 Branches, not commits" icon="seti:git">
+    You merge a **whole branch** — never one specific commit.
+  </Card>
+  <Card title="📍 HEAD is you" icon="magnifier">
+    `HEAD` = where you're standing. `git switch master` first, then merge **into** it.
+  </Card>
+</CardGrid>
+
+## Merging made easy
+
+<Steps>
+
+1. Stand on the branch you want the changes merged **into**:
+   ```bash title="receiver first"
+   git switch master
+   ```
+2. Pull the other branch's work in:
+   ```bash title="merge other in"
+   git merge bugfix
+   ```
+
+</Steps>
+
+Two moves, always in this order.
+
+## Fast-forward
+
+Master never moved while you worked, so there is nothing to reconcile.
+
+<BranchVisual mode="fast-forward" main={['master start', 'bug work']} branchName="bugfix" />
+
+Master simply catches up to the commits from `bugfix` — one straight line, no new commit.
+
+## Not all merges are fast-forwards
+
+A teammate lands work on master while you're on your branch — this happens all the time.
+
+<BranchVisual mode="merge" main={['base', 'teammate', 'merge']} branch={['bug work']} />
+
+Both sides moved, so Git writes a new merge commit below (with two parents).
+
+| Situation | Git does |
+| --- | --- |
+| Receiving branch never moved | Fast-forward — moves the pointer, no new commit |
+| Both branches moved | Merge commit — a new commit with two parents, message prompted |
+
+## Heads up: merge conflicts
+
+<Aside type="caution" title="Warning">
+Depending on the changes, Git may not be able to merge automatically. Resolve those conflicts by hand.
+</Aside>
+
+```bash title="what Git tells you"
+CONFLICT (content): Merge conflict in blah.txt
+Automatic merge failed; fix conflicts and then commit the result.
+```
+
+It rewrites the file to show what it wants resolved — **read the markers, not the panic**:
+
+```text title="blah.txt"
+<<<<<<< HEAD
+I have 2 cats
+I also have stickers
+=======
+I want a dog :(
+I need tacos
+>>>>>>> bug-fix
+```
+
+| Between these markers | Content from |
+| --- | --- |
+| `<<<<<<< HEAD … =======` | Your current `HEAD` — the branch you're merging into |
+| `======= … >>>>>>> bug-fix` | The branch you're merging from |
+
+## Resolving conflicts
+
+<Steps>
+
+1. Open the file Git listed as conflicted
+2. Pick content (yours / theirs / a blend)
+3. Strip markers
+4. Add + commit:
+   ```bash title="finish the merge"
+   git add blah.txt
+   git commit -m "Merge bugfix into master"
+   ```
+
+</Steps>
+
+Four moves, for every conflicted file.
+
+## Deleting a branch
+
+Merged branches are disposable — the pointer goes, the merged commits stay on master.
+
+```bash title="cleanup"
+git branch -d bugfix  # remove the bugfix branch pointer
+```
+
+<Aside type="note" title="Tip">
+`-d` refuses to delete a branch whose work isn't merged yet. `-D` forces it.
+</Aside>
+
+## In 30 seconds
+
+<DecisionFlow
+  start="git switch receiver + git merge other"
+  decision="Has the receiver moved since you branched?"
+  noLabel="No"
+  noResult="Fast-forward — pointer slides over, done."
+  yesLabel="Yes"
+  yesResult="Merge commit path — now check for conflicts."
+  end="Merged"
+/>
+
+<DecisionFlow
+  start="Both sides moved"
+  decision="Any conflicting edits?"
+  noLabel="No"
+  noResult="Merge commit — message prompted, done."
+  yesLabel="Yes"
+  yesResult="Fix markers → add + commit."
+  end="Merged"
+/>
+
+Every merge you will ever run, as two taps. Click the branches above.
+
+<Quiz title="Merging check">
+Where does `git merge bugfix` put the result?
+
+- [x] Into the branch I'm currently standing on
+- [ ] Into `bugfix`
+- [ ] Into a brand-new branch
+
+`HEAD` is the receiver. Switch first, then merge.
+
+</Quiz>
+
+[← Back to Git](/tools/git/)

@@ -1,0 +1,181 @@
+---
+title: Visual Demo
+description: One page demoing every visual plugin with soft-skills examples.
+tags: [visual, beginner, communication, feedback, diagrams, charts, quiz]
+---
+
+import { Card, CardGrid, Steps, Tabs, TabItem, FileTree, Badge } from '@astrojs/starlight/components';
+import { Quiz } from 'starlight-quiz/components';
+import { ShowcaseQuote, ShowcaseYouTube } from 'starlight-showcases';
+// Note: site graph needs no import — it renders automatically in the
+// right sidebar via PageSidebar (embedding PageGraph directly breaks
+// dev with `virtual:starlight-site-graph/config` + breaks /llms-full.txt).
+import SkillChart from '../../../components/SkillChart.astro';
+import LiveFeedbackDemo from '../../../components/LiveFeedbackDemo.astro';
+import UserFlow from '../../../components/visual/UserFlow.astro';
+import DecisionFlow from '../../../components/visual/DecisionFlow.astro';
+
+[← All topics](/)
+
+> This single page demos every visual plugin. Copy any section as a template for future notes.
+> Tags for this page live in frontmatter (`visual`, `beginner`, …) — see them at the bottom and browse `/tags/`.
+> Flows below are real visuals, not code — click steps and branches, or press play. Nothing is saved; everything resets on reload.
+
+## 1. User flow :badge[New]
+
+`UserFlow` — a reusable step-through flow for any topic. Click a step, or press play.
+
+<UserFlow
+  title="Giving feedback, start to finish"
+  steps={[
+    { icon: '👂', title: 'Listen fully', text: 'No interrupting — capture the full picture first.' },
+    { icon: '🪞', title: 'Reflect back', text: '“What I heard was…” — check you got it right.' },
+    { icon: '📦', title: 'Use SBI', text: 'Situation → Behavior → Impact. One example, no labels.' },
+    { icon: '🤝', title: 'Agree one action', text: 'End with a single next step, not five.' },
+    { icon: '🔁', title: 'Follow up', text: 'Revisit once. Credit the change you see.' },
+  ]}
+/>
+
+## 2. Decision flows :badge[Diagram]
+
+`DecisionFlow` — a reusable yes/no branch for any topic. Click a branch to light up that path.
+
+<DecisionFlow
+  start="Feedback needed"
+  decision="Is it timely?"
+  yesLabel="Yes"
+  yesResult="Use SBI now: situation, behavior, impact."
+  noLabel="No"
+  noResult="Note it down — wait for the right moment."
+  end="One agreed action"
+/>
+
+Same component, different topic — no new code:
+
+<DecisionFlow
+  start="Teammate goes quiet in a meeting"
+  decision="Is it my turn to make space?"
+  yesLabel="Yes"
+  yesResult="Invite them in: “Priya, what are you seeing here?”"
+  noLabel="No"
+  noResult="Stay quiet one more beat — silence is thinking too."
+  end="Everyone heard"
+/>
+
+## 3. Skill bars
+
+`SkillChart` — progress beats paragraphs. Pure HTML/CSS, so it renders everywhere with zero JavaScript libraries.
+
+<SkillChart />
+
+<SkillChart skills={[{ label: 'Git', value: 8 }, { label: 'Linux', value: 6 }, { label: 'Docker', value: 5 }]} />
+
+> Diagrams-as-code still available: ` ```mermaid ` fences and ` ```d2 ` fences render at build time in plain `.md` files. Inside interactive `.mdx` pages, prefer the components above — they render as real visuals with no client libraries to fail.
+
+## 4. Image zoom
+
+`starlight-image-zoom` — click any markdown image to zoom. Caption comes from alt text.
+
+![Houston learning visuals — click to zoom](../../../assets/houston.webp)
+
+## 5. Site graph
+
+`starlight-site-graph` — Obsidian-style graph of your notes. Check the right sidebar on this page for the mini graph + backlinks. No code needed — it builds from your internal links automatically.
+
+## 6. Video guide
+
+`starlight-videos` — turn any page into a video guide by adding `video` frontmatter (needs `videosSchema` in `content.config.ts` — currently disabled to keep tag pages stable, enable when you need it). Until then, embed videos with showcases (section 10) or plain markdown links.
+
+To make a video page later, add to its frontmatter:
+
+```md
+---
+title: My talk notes
+video:
+  type: video
+  link: https://www.youtube.com/watch?v=XXXX
+  duration: 180
+---
+```
+
+## 7. View modes + fullscreen reading
+
+`starlight-view-modes` + `starlight-fullview-mode` — look for the toolbar buttons (zen / fullview) to hide sidebars for diagram-heavy reading. Try the zen URL form manually:
+
+```text
+/zen-mode/soft-skills/visual-demo/
+```
+
+## 8. Heading badges
+
+`starlight-heading-badges` — add `:badge[Text]` to any heading, as used on sections 1–2 above.
+
+```md
+## Difficult conversation :badge[Advanced]
+```
+
+## 9. Quiz with progress
+
+`starlight-quiz` — answers persist in localStorage, results aggregate at the bottom.
+
+<Quiz title="Feedback basics">
+Which of these follows SBI?
+
+- [x] "In standup (S), you cut in twice (B), it slowed decisions (I)"
+- [ ] "You are always rude in meetings"
+- [ ] "Great job!"
+
+SBI = Situation, Behavior, Impact — specific and actionable.
+
+</Quiz>
+
+## 10. Showcases (quotes + video cards)
+
+`starlight-showcases` — gallery layouts for UI teardowns, quotes, inspiration.
+
+<ShowcaseQuote entries={[{ quote: "Feedback is a gift — if it has an example and an action.", author: "Team norm" }]} />
+
+<ShowcaseYouTube entries={[{ href: "https://www.youtube.com/watch?v=5u0Ds7wzUeI", title: "Example talk" }]} />
+
+## 11. Built-in visual blocks (no plugin)
+
+Steps, tabs, cards — prefer these over walls of text.
+
+<Steps>
+
+1. Pause and listen fully
+2. Reflect back in your words
+3. Propose one next action
+
+</Steps>
+
+<Tabs>
+  <TabItem label="Say">
+    "What I heard was… did I get that right?"
+  </TabItem>
+  <TabItem label="Don't say">
+    "You always… / You never…"
+  </TabItem>
+</Tabs>
+
+## 12. Live interactive block
+
+Custom island (`LiveFeedbackDemo.astro`) — same pattern as `astro-live-code` without the framework overhead.
+
+<LiveFeedbackDemo />
+
+## 13. Code fullscreen
+
+`starlight-codeblock-fullscreen` — hover any titled block for the fullscreen button.
+
+```js title="sbi-check.js"
+function sbi(situation, behavior, impact) {
+  return `[${situation}] ${behavior} → ${impact}`;
+}
+```
+
+## 14. Quality + AI plugins (invisible)
+
+- `starlight-links-validator` — build fails on broken internal links. Example valid links: [Soft Skills home](/soft-skills/) and [Tools](/tools/).
+- `starlight-llms-txt` — generates `/llms.txt` and `/llms-full.txt` for AI search over your notes.
+- `starlight-md-txt` — generates clean Markdown per page (e.g. this page plus `.md`) for agents.

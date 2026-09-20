@@ -1,0 +1,32 @@
+---
+---
+
+<div class="not-content" style="border:1px solid var(--sl-color-gray-5);border-radius:12px;padding:1rem;">
+  <p style="margin:0 0 0.5rem;"><strong>Try it live:</strong> paste a feedback message, get a word count + tip.</p>
+  <textarea id="feedback-input" rows="3" style="width:100%;" placeholder="e.g. Thanks for the quick review, next time I'd like clearer next steps…"></textarea>
+  <div style="display:flex;gap:0.5rem;margin-top:0.5rem;align-items:center;">
+    <button id="feedback-btn" style="padding:0.4rem 0.8rem;border-radius:8px;cursor:pointer;">Analyze</button>
+    <span id="feedback-out" aria-live="polite"></span>
+  </div>
+</div>
+
+<script>
+  function wire() {
+    const btn = document.getElementById('feedback-btn');
+    const input = document.getElementById('feedback-input');
+    const out = document.getElementById('feedback-out');
+    if (!btn || !input || !out) return;
+    btn.addEventListener('click', () => {
+      const text = input.value.trim();
+      if (!text) {
+        out.textContent = 'Write one sentence first.';
+        return;
+      }
+      const words = text.split(/\s+/).length;
+      const tip = words > 40 ? 'Great detail — now add one clear action.' : words < 12 ? 'Too short — add one example + one action.' : 'Nice length — does it have an example + action?';
+      out.textContent = `${words} words. ${tip}`;
+    });
+  }
+  document.addEventListener('astro:page-load', wire);
+  wire();
+</script>

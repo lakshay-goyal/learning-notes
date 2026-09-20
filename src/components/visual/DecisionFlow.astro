@@ -1,0 +1,176 @@
+---
+/**
+ * DecisionFlow — a reusable yes/no decision visual for any topic.
+ * Click a branch to light up that path. Stateless: resets on every page load.
+ */
+interface Props {
+  start: string;
+  steps?: string[];
+  decision: string;
+  yesLabel?: string;
+  yesResult: string;
+  noLabel?: string;
+  noResult: string;
+  end?: string;
+}
+const {
+  start,
+  steps = [],
+  decision,
+  yesLabel = 'Yes',
+  yesResult,
+  noLabel = 'No',
+  noResult,
+  end,
+} = Astro.props;
+---
+
+<div class="dflow not-content" data-dflow>
+  <div class="pill start">{start}</div>
+  {
+    steps.map((s) => (
+      <>
+        <div class="conn" aria-hidden="true" />
+        <div class="pill">{s}</div>
+      </>
+    ))
+  }
+  <div class="conn" aria-hidden="true" />
+  <div class="question">❓ {decision}</div>
+  <div class="gem" aria-hidden="true" />
+  <div class="branches">
+    <button type="button" class="branch yes" data-pick="yes">
+      <em>{yesLabel}</em>
+      <span>{yesResult}</span>
+    </button>
+    <button type="button" class="branch no" data-pick="no">
+      <em>{noLabel}</em>
+      <span>{noResult}</span>
+    </button>
+  </div>
+  {
+    end && (
+      <>
+        <div class="conn" aria-hidden="true" />
+        <div class="pill end">{end}</div>
+      </>
+    )
+  }
+</div>
+
+<script type="module">
+  document.querySelectorAll('[data-dflow]').forEach((root) => {
+    const picks = [...root.querySelectorAll('[data-pick]')];
+    picks.forEach((btn) =>
+      btn.addEventListener('click', () => {
+        picks.forEach((b) => b.classList.remove('picked'));
+        btn.classList.add('picked');
+      }),
+    );
+  });
+</script>
+
+<style>
+  .dflow {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 12px;
+    padding: 1.1rem;
+    margin: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .pill {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    padding: 0.35rem 1rem;
+    font-size: 0.92rem;
+    max-width: 100%;
+  }
+  .pill.start {
+    border-color: var(--sl-color-accent);
+    font-weight: 700;
+  }
+  .pill.end {
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+    color: #fff;
+    font-weight: 700;
+  }
+  .conn {
+    width: 2px;
+    height: 16px;
+    background: var(--sl-color-gray-5);
+  }
+  .question {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .gem {
+    width: 14px;
+    height: 14px;
+    margin: 10px 0 2px;
+    transform: rotate(45deg);
+    border: 2px solid var(--sl-color-accent);
+  }
+  .branches {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    width: 100%;
+    margin-top: 0.75rem;
+  }
+  @media (max-width: 560px) {
+    .branches {
+      grid-template-columns: 1fr;
+    }
+  }
+  .branch {
+    cursor: pointer;
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.9rem;
+    background: transparent;
+    color: inherit;
+    opacity: 0.65;
+    transition:
+      opacity 0.2s,
+      transform 0.2s;
+  }
+  .branch em {
+    font-style: normal;
+    font-weight: 800;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .branch.yes {
+    border: 2px solid #22c55e;
+  }
+  .branch.yes em {
+    color: #22c55e;
+  }
+  .branch.no {
+    border: 2px solid #f59e0b;
+  }
+  .branch.no em {
+    color: #f59e0b;
+  }
+  .branch:hover {
+    opacity: 1;
+  }
+  .branch.picked {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  .branch.yes.picked {
+    background: rgba(34, 197, 94, 0.12);
+  }
+  .branch.no.picked {
+    background: rgba(245, 158, 11, 0.12);
+  }
+</style>

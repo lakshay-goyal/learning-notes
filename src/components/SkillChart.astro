@@ -1,0 +1,97 @@
+---
+/**
+ * SkillChart — dependency-free skill bars.
+ * Pure HTML/CSS, so it renders identically in dev and build,
+ * in light and dark mode. Pass any skills; defaults are soft-skills.
+ */
+interface Skill {
+  label: string;
+  value: number;
+  max?: number;
+}
+interface Props {
+  skills?: Skill[];
+}
+const {
+  skills = [
+    { label: 'Listen', value: 7 },
+    { label: 'Feedback', value: 6 },
+    { label: 'Focus', value: 8 },
+    { label: 'Writing', value: 5 },
+    { label: 'Leadership', value: 6 },
+  ],
+} = Astro.props;
+---
+
+<div class="sbars not-content" role="img" aria-label="Skill levels">
+  {
+    skills.map((s) => {
+      const max = s.max ?? 10;
+      const pct = Math.max(0, Math.min(100, Math.round((s.value / max) * 100)));
+      return (
+        <div class="row">
+          <span class="lab">{s.label}</span>
+          <div class="track">
+            <div class="fill" style={`width:${pct}%`}>
+              <span>{s.value}</span>
+            </div>
+          </div>
+          <span class="max">/{max}</span>
+        </div>
+      );
+    })
+  }
+</div>
+
+<style>
+  .sbars {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    margin: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 96px 1fr 34px;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+  }
+  .lab {
+    font-weight: 600;
+  }
+  .max {
+    opacity: 0.6;
+    font-size: 0.8rem;
+  }
+  .track {
+    height: 26px;
+    border-radius: 999px;
+    background: var(--sl-color-gray-6);
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    min-width: 34px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--sl-color-accent), #22c55e);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    animation: grow 0.9s ease-out;
+  }
+  .fill span {
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.8rem;
+    padding-right: 0.55rem;
+  }
+  @keyframes grow {
+    from {
+      width: 0;
+    }
+  }
+</style>

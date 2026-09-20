@@ -1,0 +1,35 @@
+tags:
+  visual:
+    label: 'Visual'
+    description: 'Highly visual notes with diagrams and charts'
+    color: '#8b5cf6'
+    icon: '🎨'
+  beginner:
+    label: 'Beginner'
+    description: 'Start here'
+    color: '#22c55e'
+    difficulty: beginner
+  communication:
+    label: 'Communication'
+    description: 'Soft-skills communication notes'
+    color: '#0ea5e9'
+  feedback:
+    label: 'Feedback'
+    description: 'Giving and receiving feedback'
+    color: '#f59e0b'
+  leadership:
+    label: 'Leadership'
+    description: 'Leadership and teamwork'
+    color: '#ef4444'
+  diagrams:
+    label: 'Diagrams'
+    description: 'Mermaid and D2 diagram examples'
+    color: '#6366f1'
+  charts:
+    label: 'Charts'
+    description: 'Interactive chart examples'
+    color: '#14b8a6'
+  quiz:
+    label: 'Quiz'
+    description: 'Self-test quizzes'
+    color: '#ec4899'

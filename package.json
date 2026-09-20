@@ -10,10 +10,29 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/markdown-satteri": "^0.4.1",
     "@astrojs/starlight": "^0.42.2",
     "astro": "^7.2.10",
+    "astro-d2": "^0.14.0",
+    "astro-live-code": "^0.0.6",
+    "astro-mermaid-satteri": "^0.3.3",
+    "echarts": "^6.1.0",
+    "mermaid": "^11.17.2",
     "sharp": "^0.35.3",
-    "starlight-sidebar-topics": "^0.9.0"
+    "starlight-codeblock-fullscreen": "^2.0.0",
+    "starlight-fullview-mode": "^0.2.6",
+    "starlight-heading-badges": "^0.8.0",
+    "starlight-image-zoom": "^0.16.0",
+    "starlight-links-validator": "^0.26.0",
+    "starlight-llms-txt": "^0.12.0",
+    "starlight-md-txt": "^0.1.0",
+    "starlight-quiz": "^1.0.2",
+    "starlight-showcases": "^0.3.2",
+    "starlight-sidebar-topics": "^0.9.0",
+    "starlight-site-graph": "^0.5.0",
+    "starlight-tags": "^2.0.0",
+    "starlight-videos": "^0.5.0",
+    "starlight-view-modes": "^0.13.1"
   },
   "allowScripts": {
     "esbuild": true

@@ -9,9 +9,9 @@ Welcome to **Tools**. Every tool gets its own section so commands and workflows 
 
 ## Sections
 
-- [Git](./git/) — everyday commands, branching, rebasing, recovery
-- [Linux](./linux/) — shell, filesystem, permissions, scripting
-- [Docker](./docker/) — images, containers, volumes, Compose
+- [Git](/tools/git/) — everyday commands, branching, rebasing, recovery
+- [Linux](/tools/linux/) — shell, filesystem, permissions, scripting
+- [Docker](/tools/docker/) — images, containers, volumes, Compose
 
 ## Add a new tool
 
