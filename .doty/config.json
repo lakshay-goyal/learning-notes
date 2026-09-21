@@ -24,6 +24,7 @@
   "validation": {
     "failOnBrokenLocalLinks": true,
     "failOnNonMarkdownLearningFiles": true,
+    "reviewHtmlException": "docs/<slug>/review/*.html",
     "requireIndexEntry": true
   }
 }

@@ -311,6 +311,8 @@ function validate(root, config, args) {
   if (config.validation?.failOnNonMarkdownLearningFiles) {
     for (const file of walkFiles(docsDir)) {
       if (extname(file).toLowerCase() !== '.md') {
+        const rel = relative(docsDir, file).split(sep).join('/');
+        if (/^[^/]+\/review\/[^/]+\.html$/.test(rel)) continue;
         report('error', file, 'learning artifacts under docs must be Markdown');
       }
     }
