@@ -1,0 +1,193 @@
+---
+title: Diagnosis · Learning Harness Redesign
+description: The two root causes that made a well-governed harness produce an unusable lesson, and the five questions that find accidental architecture.
+tags: [visual, diagrams]
+learning:
+  id: learning-harness-redesign-diagnosis
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign-diagnosis
+  kind: module
+  order: 1
+  level: visual-understanding
+  category: Learning Systems
+  difficulty: intermediate
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.explain-core
+  assessmentIds:
+    - learning-harness-redesign.diagnosis-check
+  conceptIds:
+    - learning-harness-redesign.mental-model
+  labIds: []
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [debugging]
+  toolIds: []
+  prerequisites: []
+  relations: []
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import QuickRecall from '../../../../components/learning/QuickRecall.astro';
+import MentalModel from '../../../../components/learning/MentalModel.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Intermediate"
+  version="Snapshot 42b3f13"
+  prerequisites={['Basic TypeScript']}
+  researchHref="/research/learning-harness-redesign/modules/01-current-diagnosis/"
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+<QuickRecall
+  definition="Accidental architecture: a constraint that entered the system as a consequence of one successful example rather than as a deliberate decision."
+  problem="A thorough first topic produced one excellent page. The validator was written to reproduce that success, so every later topic inherited its shape."
+  mentalModel="Read a surprising constraint and ask what made it true once. If the answer is 'the exemplar looked like that', the constraint is accidental."
+  takeaways={[
+    'A validator written to reproduce one success forbids every other success.',
+    'Accidental constraints are invisible from inside, because the method they contradict also looks right.',
+    'Fix the machine contract before improving the prompt that describes it.',
+  ]}
+  whenToUse="When a system is well governed, validated, and still produces output nobody finishes."
+/>
+
+## The two root causes
+
+### Research organised by artifact type
+
+The scaffolder created the same flat siblings for every topic: lesson, plan,
+sources, implementation, exercises, revision, optional repositories.
+
+That is convenient for a validator — files either exist or they do not. It is not
+a learner journey. Understanding one mechanism meant moving across six document
+types, each with its own reading order.
+
+### Visual cardinality hardcoded
+
+The visual validator required exactly one learning page per research slug. The
+methodology described four access levels and a page hierarchy; the machine rule
+permitted none of it.
+
+The design had route-level progressive disclosure. The implementation had
+section-level disclosure inside one route. The gap between those two is the entire
+problem.
+
+## The evidence
+
+| Observed | Enforcement point | Consequence |
+| --- | --- | --- |
+| Same files for every mode | research scaffolder | `quick` and `deep` differ only in length |
+| One visual page | visual validator | child pages failed validation |
+| Topic ID equals page ID | Astro content schema | pages could not share a topic identity |
+| One hardcoded research backlink | research route page | later topics got no visual link |
+| Heading-to-anchor coverage | coverage map and validator | reachability was mistaken for teaching |
+| Dashboard entry equals topic | dashboard component | splitting would create duplicate cards |
+| Manual status strings | README frontmatter | semantic review was not machine-derived |
+
+<Aside type="note" title="How to read this table">
+  Each row names a place where a decision became enforcement. That is the useful
+  part: an unenforced convention is advice, and an enforced consequence is
+  architecture.
+</Aside>
+
+## The n = 1 pattern
+
+```text
+one high-quality example
+  → one successful page
+    → one validator written to reproduce that success
+      → every future topic forced into the same shape
+```
+
+The content was never the problem. The MCP page was thoughtful and source-aware.
+Its accidental shape became the platform.
+
+<MentalModel
+  title="Accidental architecture"
+  model="A constraint nobody chose, inherited from an exemplar. It survives because it is written down as a rule and enforced by a validator."
+  boundary="This is not an argument against thorough exemplars or against writing validators. It is an argument for validating the desired alternative in a small fixture before migrating real content."
+/>
+
+## What was worth keeping
+
+The redesign did not discard the harness. It kept:
+
+- source-backed research
+- explicit version boundaries
+- a research archive separate from presentation
+- preservation of existing work
+- deterministic checks before semantic claims
+- honest uncertainty labels
+- local-first progress privacy
+
+The failure was never evidence discipline. It was the representation and the
+cardinality.
+
+## Five questions before changing a prompt
+
+```bash
+git status --short --branch
+```
+
+1. Which file or schema forces this shape?
+2. Which validator rejects the alternative?
+3. Which component assumes the shape at runtime?
+4. Which documentation claims an enforcement the code does not provide?
+5. Can a small fixture prove the desired alternative before migrating content?
+
+<details>
+<summary>Why this order matters</summary>
+
+If the model receives a better decomposition prompt while the validator still
+rejects multiple pages, the model will either ignore the prompt or compress its
+work. Fix the machine contract first; then improve the prompt.
+
+</details>
+
+<Aside type="tip" title="Try it">
+  Question 4 is the one people skip, and it is the one that finds dead config.
+  `.agents/config.json` once carried 22 keys that no code read: documentation
+  promising enforcement that did not exist.
+</Aside>
+
+## Test yourself
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="diagnosis-check"
+  category="debugging"
+  prompt="A topic has a 4,000-word single page and a complete coverage map. What is proven, and what is the most likely cause?"
+  answer="Proven: the research is reachable. Not proven: that anything is teachable or assessable. The likely cause is hardcoded cardinality — the validator requires exactly one page per research slug, so the alternative (splitting) was illegal."
+  misconception="Treating the complete coverage map as evidence the material is well taught."
+  reviewHref="#the-evidence"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="fix-order"
+  category="application"
+  prompt="You want better prompts. A validator rejects multi-page topics. What do you change first?"
+  answer="The validator. A better prompt cannot produce a legal three-page topic while the contract forbids it, so the model will compress its work or ignore the prompt. Make the desired shape legal and testable, then improve the prompt."
+  misconception="Assuming a more detailed instruction file compensates for a contract that rejects the desired output."
+  reviewHref="#five-questions-before-changing-a-prompt"
+/>
+
+## Where next
+
+<CardGrid>
+  <Card title="Content ontology" icon="sitemap">
+    The entities a harness must distinguish before it can store them.
+    [Next →](../ontology/)
+  </Card>
+  <Card title="Back to the overview" icon="home">
+    [Overview →](../)
+  </Card>
+</CardGrid>
+
+Full chapter: [Module 1 · Current diagnosis](/research/learning-harness-redesign/modules/01-current-diagnosis/)

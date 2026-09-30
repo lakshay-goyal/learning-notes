@@ -1,6 +1,7 @@
 ---
 name: generate-recall
-description: Generate topic-specific, answer-hidden active-recall prompts linked to exact learning objectives and sections, including prediction, debugging, application, architecture, and trade-off reasoning.
+description: "Write answer-hidden recall prompts tied to objectives and sections."
+invocation: model
 ---
 
 # Generate Recall

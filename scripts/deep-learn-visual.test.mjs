@@ -18,6 +18,24 @@ function run(root, ...args) {
 	return spawnSync(process.execPath, [cli, ...args, '--root', root], { encoding: 'utf8' });
 }
 
+/**
+ * Write the learning design file a topic is planned against.
+ *
+ * Objective coverage is only checkable when a topic declares its objectives, so
+ * a fixture that exercises page-contract rules needs one too.
+ */
+function writeLearningDesign(root, slug, objectives) {
+	const objectiveRows = objectives
+		.map((id) => `| \`${slug}.${id}\` | Demonstrate ${id.replace(/-/g, ' ')}. |`)
+		.join('\n');
+	writeFileSync(
+		join(root, 'docs', slug, 'learning.md'),
+		`---\ntitle: "Learning design"\nslug: "${slug}"\ntopicId: "${slug}"\nmode: deep\nstatus: draft\npageCount: 1\nobjectiveCount: ${objectives.length}\n---\n\n` +
+			`# Learning design\n\n## Objectives\n\n| Objective ID | Statement |\n| --- | --- |\n${objectiveRows}\n\n` +
+			`## Concepts\n\n| Concept ID | Name | Statement |\n| --- | --- | --- |\n\n## Page plan\n\n| Order | Kind | Page ID | Access level | Objectives | Assessment |\n| --- | --- | --- | --- | --- | --- |\n`,
+	);
+}
+
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), 'deep-learn-visual-test-'));
 	mkdirSync(join(root, '.agents/coverage'), { recursive: true });
@@ -30,9 +48,10 @@ function fixture() {
 		join(root, 'docs/sample-topic/README.md'),
 		`---\ntitle: Sample\nslug: sample-topic\nstatus: validated\n---\n\n# Sample\n\n## Mechanism\n\nSource truth.\n`,
 	);
+	writeLearningDesign(root, 'sample-topic', ['explain']);
 	writeFileSync(
 		join(root, 'src/content/docs/sample/index.mdx'),
-		`---\ntitle: Sample\nlearning:\n  id: sample-topic\n  category: Test\n  difficulty: beginner\n  researchSlug: sample-topic\n  updated: 2026-09-21\n---\n\n## Mechanism\n\n[Research](/research/sample-topic/)\n`,
+		`---\ntitle: Sample\nlearning:\n  id: sample-topic\n  category: Test\n  difficulty: beginner\n  researchSlug: sample-topic\n  updated: 2026-09-21\n  objectiveIds: [sample-topic.explain]\n  assessmentIds: [sample-topic.explain-check]\n---\n\n## Mechanism\n\n[Research](/research/sample-topic/)\n`,
 	);
 	writeFileSync(
 		join(root, '.agents/coverage/sample-topic.md'),
@@ -68,6 +87,14 @@ function multiPageFixture(childCount = 4) {
 	rmSync(join(root, 'src/content/docs/sample'), { recursive: true, force: true });
 	rmSync(join(root, '.agents/coverage/sample-topic.md'), { force: true });
 
+	// The design declares every objective the pages reference, so objective
+	// coverage is a separate concern from the page contract itself.
+	writeLearningDesign(
+		root,
+		slug,
+		['explain-boundary', ...Array.from({ length: childCount }, (_, index) => `objective-${index}`)],
+	);
+
 	writePage(
 		root,
 		'ai/deep-topic/index.mdx',
@@ -84,8 +111,8 @@ function multiPageFixture(childCount = 4) {
 			'  domainIds: [ai-engineering]',
 			'  fieldIds: [agent-integration]',
 			'  skillIds: [api-design]',
-			'  objectiveIds: [deep.explain-boundary]',
-			'  assessmentIds: [deep.boundary-recall]',
+			`  objectiveIds: [${slug}.explain-boundary]`,
+			`  assessmentIds: [${slug}.boundary-recall]`,
 		].join('\n'),
 		`## Foundations\n\nOverview text.\n\n[Research](/research/${slug}/)\n`,
 	);
@@ -105,8 +132,8 @@ function multiPageFixture(childCount = 4) {
 				'  difficulty: intermediate',
 				`  researchSlug: ${slug}`,
 				'  updated: 2026-09-21',
-				`  objectiveIds: [deep.objective-${index}]`,
-				`  assessmentIds: [deep.assessment-${index}]`,
+				`  objectiveIds: [${slug}.objective-${index}]`,
+				`  assessmentIds: [${slug}.assessment-${index}]`,
 			].join('\n'),
 			`## ${kinds[index]} detail\n\nChild page body.\n\n[Research](/research/${slug}/)\n`,
 		);
@@ -360,6 +387,168 @@ test('a child page without objectives is rejected', (t) => {
 	const result = run(root, 'validate', 'deep-topic', '--strict');
 	assert.equal(result.status, 1);
 	assert.match(result.stderr, /requires at least one learning\.objectiveIds entry/);
+});
+
+test('a review report does not invalidate the coverage map', (t) => {
+	const root = multiPageFixture(2);
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	// Build a complete coverage map first, so the only possible cause of failure
+	// is the review report appearing under the research package.
+	const rows = [
+		['README.md', 'Foundations', 'src/content/docs/ai/deep-topic/index.mdx', '#foundations'],
+		['README.md', 'Lifecycle', 'src/content/docs/ai/deep-topic/0-module.mdx', '#module-detail'],
+		['README.md', 'Reliability', 'src/content/docs/ai/deep-topic/1-module.mdx', '#module-detail'],
+	];
+	writeFileSync(
+		join(root, '.agents/coverage/deep-topic.md'),
+		`| Source file | Source section | Destination file | Destination anchor | Status | Transformation |\n| --- | --- | --- | --- | --- | --- |\n` +
+			rows.map((r) => `| ${r[0]} | ${r[1]} | ${r[2]} | ${r[3]} | MAPPED | Taught directly. |`).join('\n') +
+			'\n',
+	);
+
+	// `review-learning` writes docs/<slug>/review/review.md. Before the fix its
+	// level-two headings were treated as research source sections, so auditing a
+	// topic demanded coverage rows for "## Scope" and "## Coverage" and the map
+	// broke until they were added by hand.
+	mkdirSync(join(root, 'docs/deep-topic/review'), { recursive: true });
+	writeFileSync(
+		join(root, 'docs/deep-topic/review/review.md'),
+		'## Scope\n\nReviewed.\n\n## Coverage\n\nAll good.\n',
+	);
+
+	const result = run(root, 'validate', 'deep-topic', '--strict');
+	assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+	assert.doesNotMatch(result.stderr, /review\/review\.md/);
+
+	// And a stale row that maps agent output is itself an error, so the map
+	// cannot quietly accumulate rows pointing at rewritten files.
+	writeFileSync(
+		join(root, '.agents/coverage/deep-topic.md'),
+		readFileSync(join(root, '.agents/coverage/deep-topic.md'), 'utf8') +
+			'| review/review.md | Scope | src/content/docs/ai/deep-topic/index.mdx | #foundations | MAPPED | Wrong. |\n',
+	);
+	const stale = run(root, 'validate', 'deep-topic', '--strict');
+	assert.equal(stale.status, 1);
+	assert.match(stale.stderr, /coverage row targets agent output/);
+});
+
+test('objective coverage is checked against the learning design', (t) => {
+	const root = multiPageFixture(3);
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	const rows = [
+		['Foundations', 'src/content/docs/ai/deep-topic/index.mdx', '#foundations'],
+		['Lifecycle', 'src/content/docs/ai/deep-topic/0-module.mdx', '#module-detail'],
+		['Reliability', 'src/content/docs/ai/deep-topic/1-module.mdx', '#module-detail'],
+		['Alternatives', 'src/content/docs/ai/deep-topic/2-deep-dive.mdx', '#deep-dive-detail'],
+	];
+	writeFileSync(
+		join(root, '.agents/coverage/deep-topic.md'),
+		`| Source file | Source section | Destination file | Destination anchor | Status | Transformation |\n| --- | --- | --- | --- | --- | --- |\n` +
+			rows.map((r) => `| README.md | ${r[0]} | ${r[1]} | ${r[2]} | MAPPED | Taught. |`).join('\n') +
+			'\n',
+	);
+
+	// Every declared objective has a page carrying an assessment.
+	const green = run(root, 'validate', 'deep-topic', '--strict');
+	assert.equal(green.status, 0, `${green.stdout}\n${green.stderr}`);
+	assert.match(green.stdout, /objective coverage 4\/4/);
+
+	// Add an objective nothing teaches. Previously objectives were parsed and
+	// never compared with anything, so this passed silently.
+	const design = join(root, 'docs/deep-topic/learning.md');
+	writeFileSync(
+		design,
+		readFileSync(design, 'utf8').replace(
+			'| --- | --- |',
+			`| \`deep-topic.unassessed\` | Demonstrate something nothing teaches. |\n| --- | --- |`,
+		),
+	);
+
+	const red = run(root, 'validate', 'deep-topic', '--strict');
+	assert.equal(red.status, 1);
+	assert.match(red.stderr, /unassessed/);
+	assert.match(red.stderr, /no assessment/);
+});
+
+test('a page with no assessment is rejected', (t) => {
+	const root = multiPageFixture(2);
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	writePage(
+		root,
+		'ai/deep-topic/unassessed.mdx',
+		[
+			'learning:',
+			'  id: unassessed',
+			'  topicId: deep-topic',
+			'  kind: module',
+			'  order: 8',
+			'  category: AI Engineering',
+			'  difficulty: intermediate',
+			'  researchSlug: deep-topic',
+			'  updated: 2026-09-21',
+			'  objectiveIds: [deep-topic.objective-0]',
+		].join('\n'),
+	);
+
+	const result = run(root, 'validate', 'deep-topic', '--strict');
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /declares no learning\.assessmentIds/);
+});
+
+test('a page objective missing from the design is rejected', (t) => {
+	const root = multiPageFixture(2);
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	writePage(
+		root,
+		'ai/deep-topic/undocumented.mdx',
+		[
+			'learning:',
+			'  id: undocumented',
+			'  topicId: deep-topic',
+			'  kind: module',
+			'  order: 8',
+			'  category: AI Engineering',
+			'  difficulty: intermediate',
+			'  researchSlug: deep-topic',
+			'  updated: 2026-09-21',
+			'  objectiveIds: [deep-topic.never-planned]',
+			'  assessmentIds: [deep-topic.some-check]',
+		].join('\n'),
+	);
+
+	const result = run(root, 'validate', 'deep-topic', '--strict');
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /never-planned.*is not declared/);
+});
+
+test('inspect warns when a topic that plans several pages ships one', (t) => {
+	const root = multiPageFixture(3);
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	// Remove every child page, leaving only the overview.
+	for (const name of ['0-module.mdx', '1-module.mdx', '2-deep-dive.mdx']) {
+		rmSync(join(root, 'src/content/docs/ai/deep-topic', name), { force: true });
+	}
+
+	const inspected = run(root, 'inspect', 'deep-topic');
+	assert.match(inspected.stdout, /Learning pages: 1/);
+	assert.match(inspected.stdout, /plans at least \d+; run migrate-content/);
+});
+
+test('the learning design file is not itself a coverage source', (t) => {
+	const root = fixture();
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	const result = run(root, 'validate', 'sample-topic', '--strict');
+	assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+	// `learning.md` has three level-two headings. Counting them as research
+	// source sections made every published topic fail coverage until a row was
+	// written for "## Objectives".
+	assert.doesNotMatch(result.stderr, /learning\.md::/);
 });
 
 test('research-only is a legal state, not a validation failure', (t) => {

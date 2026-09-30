@@ -12,8 +12,13 @@
 		"validate:research": "node .agents/bin/deep-learn.mjs validate --all --strict",
 		"validate:learning": "node .agents/bin/deep-learn-visual.mjs validate --all --strict",
 		"doctor": "node .agents/bin/deep-learn.mjs doctor",
+		"index": "node .agents/bin/deep-learn.mjs index",
 		"harness:sync": "node .agents/bin/deep-learn.mjs sync",
-		"harness:check": "node .agents/bin/deep-learn.mjs sync --check && npm run validate:research && npm run validate:learning"
+		"harness:status": "node .agents/bin/harness.mjs status",
+		"harness:features": "node .agents/bin/harness.mjs features",
+		"harness:check": "node .agents/bin/harness.mjs check",
+		"harness:check:static": "node .agents/bin/harness.mjs check --layer=static",
+		"harness:receipt": "node .agents/bin/harness.mjs receipt"
 	},
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.4.1",

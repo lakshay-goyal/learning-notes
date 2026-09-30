@@ -10,27 +10,26 @@ const { topicId, title } = Astro.props;
 <aside class="revision-status not-content" data-revision-status data-topic-id={topicId} data-title={title}>
 	<div>
 		<p class="learning-kicker">Retention</p>
-		<strong data-revision-label>Not registered for revision</strong>
+		<strong data-revision-label>Not yet reviewed</strong>
 		<span data-revision-detail>Progress stays in this browser only.</span>
 	</div>
 	<div class="revision-actions">
 		<a href="#test-yourself">Review questions</a>
-		<button type="button" class="learning-action" data-mark-learned>Mark learned</button>
 	</div>
 </aside>
 
 <script>
-	const REVISION_STORAGE_KEY = 'deep-learn-visual:v1';
-	const REVISION_DAY = 86_400_000;
+	import { readTopic, storageAvailable, writeTopic } from './progress-store.mjs';
 
-	function readRevisionState() {
-		try {
-			return JSON.parse(localStorage.getItem(REVISION_STORAGE_KEY) || '{"topics":{}}');
-		} catch {
-			return { topics: {} };
-		}
-	}
-
+	/**
+	 * This component reports evidence, never mastery.
+	 *
+	 * It used to ship a "Mark learned" button that set `status: learned`. A
+	 * self-rating is not evidence of competence: a learner can click it without
+	 * answering anything. The harness is explicit that mastery is not claimed
+	 * from a button, so the button is gone and the panel reports only what
+	 * actually happened — recall attempts and their ratings.
+	 */
 	function wireRevisionStatus() {
 		document.querySelectorAll('[data-revision-status]').forEach((root) => {
 			if (!(root instanceof HTMLElement) || root.dataset.wired === 'true') return;
@@ -39,42 +38,47 @@ const { topicId, title } = Astro.props;
 			const title = root.dataset.title;
 			const label = root.querySelector('[data-revision-label]');
 			const detail = root.querySelector('[data-revision-detail]');
-			const button = root.querySelector('[data-mark-learned]');
 			if (!topicId) return;
 
+			const usable = storageAvailable();
 			const render = () => {
-				const topic = readRevisionState().topics?.[topicId];
-				if (!topic) return;
-				if (label) label.textContent = topic.status === 'learned' ? 'Registered for revision' : 'Currently studying';
-				const reviewed = Object.keys(topic.questions ?? {}).length;
-				if (detail) detail.textContent = `${reviewed} recall prompt${reviewed === 1 ? '' : 's'} attempted · browser-local progress`;
-				if (button) button.textContent = topic.status === 'learned' ? 'Learning saved' : 'Mark learned';
+				const topic = readTopic(topicId);
+				const attempted = Object.values(topic.questions ?? {});
+				const ratings = attempted.filter((entry) => entry.rating).length;
+
+				if (label) {
+					if (!usable) {
+						label.textContent = 'Progress unavailable';
+					} else if (!attempted.length) {
+						label.textContent = 'Not yet reviewed';
+					} else {
+						// Report what was done, not a level of mastery.
+						label.textContent = `${ratings} of ${attempted.length} recall prompt${attempted.length === 1 ? '' : 's'} answered`;
+					}
+				}
+				if (detail) {
+					detail.textContent = !usable
+						? 'This browser cannot store progress. The lesson content is unaffected.'
+						: attempted.length
+							? 'Answers are recorded, not a mastery claim · browser-local, not synchronized'
+							: 'Answer a recall prompt to record evidence · browser-local, not synchronized';
+				}
 			};
 
-			const state = readRevisionState();
-			state.topics ??= {};
-			const topic = (state.topics[topicId] ??= { status: 'studying', questions: {} });
-			topic.title = title;
-			topic.lastOpened = new Date().toISOString();
-			localStorage.setItem(REVISION_STORAGE_KEY, JSON.stringify(state));
+			if (usable && title) {
+				// Opening a topic records that it was opened. That is exposure, and
+				// it is labelled as such rather than as progress.
+				writeTopic(topicId, { title, status: 'studying', lastOpened: new Date().toISOString() });
+			}
 			render();
 
-			button?.addEventListener('click', () => {
-				const next = readRevisionState();
-				const current = (next.topics[topicId] ??= { questions: {} });
-				current.title = title;
-				current.status = 'learned';
-				current.completedAt = new Date().toISOString();
-				current.nextReview = new Date(Date.now() + 3 * REVISION_DAY).toISOString();
-				localStorage.setItem(REVISION_STORAGE_KEY, JSON.stringify(next));
-				render();
-				window.dispatchEvent(new CustomEvent('deep-learn-progress'));
-			});
+			window.addEventListener('deep-learn-progress', render);
+			document.addEventListener('astro:page-load', render);
 		});
 	}
 
-	document.addEventListener('astro:page-load', wireRevisionStatus);
 	wireRevisionStatus();
+	document.addEventListener('astro:page-load', wireRevisionStatus);
 </script>
 
 <style>

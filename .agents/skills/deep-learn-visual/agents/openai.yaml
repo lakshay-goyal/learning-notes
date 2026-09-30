@@ -1,8 +1,8 @@
 interface:
   display_name: "DeepLearn Visual"
-  short_description: "Turn research into visual learning docs"
+  short_description: "Publish research as multi-page visual lessons"
   brand_color: "#7C3AED"
-  default_prompt: "Use $deep-learn-visual to publish an existing DeepLearn research topic as a visual, retention-focused Astro learning experience."
+  default_prompt: "Use $deep-learn-visual to publish a validated DeepLearn research topic as a multi-page, retention-focused Astro learning experience."
 
 policy:
   allow_implicit_invocation: true

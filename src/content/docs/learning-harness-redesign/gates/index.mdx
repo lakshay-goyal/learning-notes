@@ -1,0 +1,265 @@
+---
+title: Quality gates · Learning Harness Redesign
+description: One vocabulary, six ordered gates, recoverable commands, and the ownership rules that make parallel agents safe.
+tags: [visual, diagrams]
+learning:
+  id: learning-harness-redesign-gates
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign-gates
+  kind: deep-dive
+  order: 5
+  level: complete-understanding
+  category: Learning Systems
+  difficulty: advanced
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.diagnose-failure
+    - learning-harness-redesign.evaluate-tradeoffs
+  assessmentIds:
+    - learning-harness-redesign.gates-check
+  conceptIds:
+    - learning-harness-redesign.gates
+    - learning-harness-redesign.orchestration
+    - learning-harness-redesign.migration
+  labIds: []
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [testing]
+  toolIds: []
+  prerequisites: ['The learning lifecycle']
+  relations: []
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import DeepDive from '../../../../components/learning/DeepDive.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Advanced"
+  version="Snapshot 42b3f13"
+  prerequisites={['The learning lifecycle']}
+  researchHref="/research/learning-harness-redesign/modules/05-harness-architecture/"
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+A harness is not a folder of prompts. It accepts an intent, reads the minimum
+relevant context, produces a bounded artifact, validates structure, requests
+independent semantic review, transitions state, and preserves the next update
+path.
+
+## One source of truth
+
+The same vocabulary must not live independently in a Markdown policy, a template,
+a JavaScript array, an Astro Zod schema, a config file, and a generated report.
+
+```text
+intents and modes        research statuses      source inspection statuses
+page roles               assessment categories  coverage statuses
+relation types           taxonomy facets
+```
+
+Pick one canonical definition and generate or validate the rest.
+
+<DeepDive summary="Research statuses moved into a contract module the CLI imports; page kinds are imported straight into the Astro schema">
+The earlier state was the same idea written twice:
+
+```js
+// learning-contract.mjs
+export const RESEARCH_STATUSES = ['draft', 'researched', 'validated', 'needs-refresh'];
+
+// deep-learn.mjs — the same list, typed out again
+if (!['draft', 'researched', 'validated', 'needs-refresh'].includes(metadata.status))
+```
+
+A parser that is slightly wrong in three places is three bugs waiting to happen.
+</DeepDive>
+
+## Shared parsers and one route resolver
+
+One YAML parser, one schema package, one route resolver, one anchor
+implementation, shared error types, and optional `--json` output for automation.
+
+<Aside type="note" title="Anchor correctness is not cosmetic">
+  An early validator hand-rolled heading slugs and disagreed with the build:
+
+  ```text
+  heading    Module 1 — Why the current harness fights the learner
+  built id   module-1--why-the-current-harness-fights-the-learner
+  old guess  module-1-why-the-current-harness-fights-the-learner
+  ```
+
+  A coverage row authored against the guess would validate against an anchor the
+  published page does not have. The validator now delegates to the same slugger
+  the build uses.
+</Aside>
+
+## State machines
+
+Research and publication must not share one status string.
+
+```text
+research     draft → researched → validated → needs-refresh
+publication  research-only → published → incomplete → archived
+learner      not-started → learning → practised → assessed → mastered
+```
+
+A topic can be `validated` in research while its pages are still `planned`.
+
+## Safe transitions
+
+A transition command should:
+
+1. check preconditions
+2. run the relevant validators
+3. record who requested it and when
+4. update derived frontmatter and indexes
+5. refuse invalid transitions
+6. leave a recoverable journal
+
+Do not let an agent type `status: validated` and call it done.
+
+## The gates
+
+| Gate | Catches | Example failure it owns |
+| --- | --- | --- |
+| **A · configuration** | dead keys, contradictory vocabulary, unreferenced commands | a config key nothing reads |
+| **B · content graph** | identity, routes, orphans, cycles | two pages sharing a `pageId` |
+| **C · evidence** | sources, versions, links, anchors | a claim citing a source that was only discovered |
+| **D · learning design** | objectives, assessments, labs, cognitive load | an objective with nothing to assess it |
+| **E · application** | schemas, build, accessibility, storage | a route that 404s |
+| **F · semantic review** | accuracy, fidelity, usability | a plausible but wrong mechanism diagram |
+
+<DeepDive summary="Gates A, B, C, and E run as three ordered layers: static, runtime, then system">
+The previous aggregate was a chain of npm scripts reporting only the last exit
+code, so an early failure could hide behind a later success. Running
+`node .agents/bin/harness.mjs check` reports which layer failed and prints the
+commands it ran.
+</DeepDive>
+
+Gates D and F are not automatable. D is partly mechanical now — objective
+coverage is checked — but only reading catches an objective that is named without
+being taught. F is an independent review with its own write scope.
+
+## Recoverable commands
+
+```text
+classify   plan      research   model      author
+publish    practice  review     doctor     sync --check
+validate   transition
+```
+
+Each should be idempotent where possible, explicit about writes, safe against
+partial failure, able to emit JSON, and able to explain why it refused.
+
+## Multi-agent safety
+
+Parallel agents are useful only after the manager has defined stable IDs, file
+ownership, dependency order, merge rules, and independent verification.
+
+| Role | Owns | Does not own |
+| --- | --- | --- |
+| Manager | taxonomy, IDs, plan, state | source prose |
+| Research planner | questions, scope, evidence plan | lesson structure |
+| Source worker | source analysis and claims | topic identity |
+| Curriculum designer | objectives, concepts, assessments | app routes |
+| Module author | one assigned module | unrelated modules |
+| Publisher | presentation and route metadata | new technical claims |
+| Verifier | an independent quality report | editing reviewed content |
+
+<Aside type="caution" title="Two failures that look like progress">
+  Two authors writing the same module "and reconciling later" produce duplicate
+  concepts and conflicting metadata. A publisher changing routes while an author
+  changes the manifest produces an index that describes a structure nobody built.
+</Aside>
+
+Every worker returns the same envelope:
+
+```text
+task ID
+files read
+files changed, or explicitly none
+IDs and routes used
+evidence collected
+uncertainties
+checks run
+recommended next task
+```
+
+## Migration mechanics
+
+A contract change lands before content migration:
+
+1. separate `topicId` from `pageId`
+2. allow one overview plus multiple pages
+3. require objective and assessment IDs
+4. add the learning design file
+5. build multi-page fixtures
+6. pilot two topics
+7. add CI and freshness tracking
+
+Change the machine contract first, then migrate content. The reverse order means
+content written against the old contract has to be rewritten twice.
+
+## Match the failure to the gate
+
+| Failure | Gate | Error category |
+| --- | --- | --- |
+| Two pages share a `pageId` | B | duplicate page ID |
+| A page points to missing research | B | orphan learning page |
+| A relative link is broken | C | broken internal link |
+| An objective has no assessment | D | uncovered objective |
+| A source version is stale | C | stale evidence |
+| A page is huge but coherent | D | split recommended |
+| A claim has no inspected source | F | unsupported claim |
+| Progress storage is full | E | progress unavailable |
+
+## Test yourself
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="gates-check"
+  category="debugging"
+  prompt="Coverage maps every research heading, all validators pass, and the topic is marked validated. A learner still cannot answer a basic question about the mechanism. Which gate failed?"
+  answer="Gate D, learning design — and possibly F. The coverage map proves reachability, not teaching. If no page declares an objective for the mechanism, or the objective has no assessment, nothing forces the material to be taught. Check the objective set and whether any assessment would evidence it."
+  misconception="Assuming a complete coverage map plus a green validator means the topic is well taught."
+  reviewHref="#the-gates"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="contract-before-prompt"
+  category="trade-offs"
+  prompt="You want agents to produce multi-page topics. The schema still declares one pageId per topic. What is the cheapest change that actually works?"
+  answer="Change the schema and the validator, and prove the alternative with a small fixture, before touching any prompt. A better prompt cannot produce a legal three-page topic while the contract forbids it, so the model will compress or ignore it."
+  misconception="Rewriting the prompts and hoping the schema follows."
+  reviewHref="#migration-mechanics"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="verifier-independence"
+  category="architecture"
+  prompt="Why must the verifier have its own write scope?"
+  answer="Because a verifier that edits the material it verifies is no longer independent. Self-evaluation is systematically too positive: the same context that wrote the page rates it generously. A separate read-only scope and a separate output file are what make the verdict worth reading."
+  misconception="Allowing the verifier to fix small issues it finds, for efficiency."
+  reviewHref="#multi-agent-safety"
+/>
+
+## Where next
+
+<CardGrid>
+  <Card title="Practice the redesign" icon="pencil">
+    Apply the contract to a real topic, then migrate it.
+    [Practice →](../practice/)
+  </Card>
+  <Card title="Back to the overview" icon="home">
+    [Overview →](../)
+  </Card>
+</CardGrid>
+
+Full chapters: [05 · Harness architecture](/research/learning-harness-redesign/modules/05-harness-architecture/) · [07 · Multi-agent orchestration](/research/learning-harness-redesign/modules/07-multi-agent-orchestration/) · [08 · Migration roadmap](/research/learning-harness-redesign/modules/08-migration-roadmap/)

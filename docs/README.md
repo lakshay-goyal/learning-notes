@@ -1,21 +1,46 @@
 # Engineering knowledge base
 
-This directory is the Markdown source of truth for DeepLearn research packages. Each topic has a stable slug, a navigable main lesson, a research plan, sources, implementation material, exercises, and revision material appropriate to its learning mode.
+The Markdown source of truth for DeepLearn research packages. Each topic has a
+stable slug, a main lesson, a research plan, a source ledger, a learning design,
+and implementation, exercise, and revision material appropriate to its mode.
 
 ## Using this knowledge base
 
-- Start a topic: `node .agents/bin/deep-learn.mjs new "Topic name" --mode deep`
-- Refresh the index: `node .agents/bin/deep-learn.mjs index`
-- Validate a draft: `node .agents/bin/deep-learn.mjs validate <topic-slug>`
-- Validate completed research: `node .agents/bin/deep-learn.mjs validate <topic-slug> --strict`
+```bash
+node .agents/bin/deep-learn.mjs new "Topic name" --mode deep
+node .agents/bin/deep-learn.mjs index
+node .agents/bin/deep-learn.mjs validate <topic-slug>            # a draft
+node .agents/bin/deep-learn.mjs validate <topic-slug> --strict   # validated research
+node .agents/bin/deep-learn.mjs doctor
+```
 
-Ask Codex to “Use DeepLearn to teach me …”, “go deeper into …”, or “review my understanding of …” to run the agent-driven workflow.
+`new` writes the research package and `docs/<slug>/learning.md` together. The
+learning design holds the objectives, concepts, and multi-page plan the visual
+stage works from.
 
-To publish validated research as a visual, retention-focused Astro lesson, ask Codex to “Use DeepLearn Visual to publish my … research.” The visual layer preserves these files as the source of truth, records section-level coverage in `.agents/coverage/`, and exposes the original Markdown under `/research/<topic>/`.
+Ask the agent to "teach me …", "go deeper into …", or "review my understanding
+of …". To publish validated research as a visual lesson, ask it to "publish my
+… research".
+
+## Package contents
+
+| File | Holds |
+| --- | --- |
+| `README.md` | main lesson and navigation |
+| `learning.md` | objectives, concepts, page plan, assessments |
+| `research-plan.md` | scope, questions, evidence plan, stop conditions |
+| `implementation.md` | examples and the execution record |
+| `exercises.md` | active-learning prompts |
+| `revision.md` | retrieval prompts and self-assessment |
+| `sources.md` | source ledger with versions and inspection status |
+| `repositories.md` | inspected source, only when relevant |
+| `review/` | review output, excluded from coverage validation |
 
 ## Topics
 
-> **New interactive guide:** start with [Learning Harness Redesign](learning-harness-redesign/) for a chapter-based path through the architecture audit. Read the overview first; do not consume every chapter linearly.
+> **Interactive guide:** [Learning Harness Redesign](learning-harness-redesign/) is a
+> chapter-based path through the architecture audit. Read the overview first; do not
+> consume every chapter linearly.
 
 <!-- DEEP_LEARN_INDEX_START -->
 
@@ -27,7 +52,12 @@ To publish validated research as a visual, retention-focused Astro lesson, ask C
 
 ## Status legend
 
-- `draft`: scaffolded or incomplete
-- `researched`: drafted but awaiting semantic validation
-- `validated`: deterministic and semantic gates completed; limitations may still be documented
-- `needs-refresh`: important time-sensitive material requires new verification
+| Status | Meaning |
+| --- | --- |
+| `draft` | scaffolded or materially incomplete |
+| `researched` | evidence gathered and lesson written; semantic review pending |
+| `validated` | deterministic and semantic gates completed; limitations may still be documented |
+| `needs-refresh` | important time-sensitive material requires re-verification |
+
+`validated` means both gates passed. It never means every fact is guaranteed.
+Limitations and unresolved questions stay visible in the package.

@@ -1,0 +1,8 @@
+interface:
+  display_name: "Connect Knowledge"
+  short_description: "Link topics by stable ID and real route"
+  brand_color: "#6366F1"
+  default_prompt: "Use $connect-knowledge to add meaningful, route-backed relationships between published topics."
+
+policy:
+  allow_implicit_invocation: true

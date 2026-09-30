@@ -1,6 +1,7 @@
 ---
 name: generate-learning-page
-description: Create or incrementally update a reusable Astro/Starlight Markdown or MDX topic page from a knowledge structure and coverage map while preserving research access and stable routes.
+description: "Author or update one focused learning page from the topic learning design."
+invocation: model
 ---
 
 # Generate Learning Page

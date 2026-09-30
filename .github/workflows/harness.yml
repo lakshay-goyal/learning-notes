@@ -1,0 +1,67 @@
+name: harness
+
+# Every gate runs here so no gate is optional. A manual gate is not a gate:
+# the aggregate `harness:check` was failing in the repository before CI existed,
+# and nothing noticed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    name: learning harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Knowledge index is current
+        run: node .agents/bin/deep-learn.mjs sync --check
+
+      # Layer 1: structural truth. Research and visual contracts.
+      - name: Static gate
+        run: npm run harness:check:static
+
+      # Layer 2: executable assertions.
+      - name: Runtime gate
+        run: npm test
+
+      # Layer 3: the repository builds and its state is coherent.
+      - name: Doctor
+        run: npm run doctor
+
+      - name: Production build
+        run: npm run build
+
+      - name: Feature list is internally consistent
+        run: node .agents/bin/harness.mjs features --json
+
+      - name: Harness status
+        run: node .agents/bin/harness.mjs status --json
+
+      # Upload receipts so a passing run is evidence rather than a claim.
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-evidence
+          path: |
+            .agents/evidence/
+            dist/
+          if-no-files-found: ignore
+          retention-days: 14

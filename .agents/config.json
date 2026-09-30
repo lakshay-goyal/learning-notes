@@ -1,20 +1,24 @@
 {
-  "version": 2,
+  "version": 3,
   "harnessName": "learning-harness",
   "harnessRoot": ".agents",
   "outputDirectory": "docs",
   "defaultMode": "deep",
+
   "preferredProgrammingLanguage": "TypeScript",
   "preferredFrontendFramework": "React and Next.js",
   "preferredBackendEnvironment": "Node.js",
   "preferredMobileEnvironment": "React Native and Expo",
   "preferredCloudPlatform": "AWS with Terraform",
+
   "repositoryInvestigationDepth": "source-trace",
   "maximumPrimaryRepositories": 3,
   "projectIdeasEnabled": true,
   "practicalExercisesEnabled": true,
-  "requireVersionVerification": true,
   "includeProductionAnalysisByDefault": true,
+  "requireVersionVerification": true,
+  "requireReviewOutputExclusion": true,
+
   "requiredCoreFiles": [
     "README.md",
     "research-plan.md",
@@ -28,6 +32,8 @@
     "codebase": ["README.md", "research-plan.md", "implementation.md", "exercises.md", "revision.md", "sources.md", "repositories.md"],
     "review": ["README.md", "research-plan.md", "sources.md", "revision.md"]
   },
+  "requiredLearningDesignFile": "learning.md",
+
   "researchDirectory": "docs",
   "researchTemplateDirectory": ".agents/templates/research",
   "visualTemplateDirectory": ".agents/templates/visual",
@@ -35,15 +41,38 @@
   "learningDirectory": "src/content/docs",
   "coverageDirectory": ".agents/coverage",
   "learningComponentsDirectory": "src/components/learning",
+  "stateDirectory": ".agents/state",
+  "evidenceDirectory": ".agents/evidence",
+  "reviewRecordDirectory": ".agents/reviews",
+  "featureListPath": ".agents/features.json",
+  "progressFile": ".agents/PROGRESS.md",
+  "glossaryFile": ".agents/GLOSSARY.md",
+  "exceptionsFile": ".agents/state/exceptions.json",
+
   "researchRoutePrefix": "/research",
   "progressStorage": "browser-local",
-  "progressStorageKey": "deep-learn-visual:v2",
+  "progressStorageKey": "deep-learn-visual:v1",
+
   "requiredLearningLevels": [
     "quick-recall",
     "visual-understanding",
     "complete-understanding",
     "active-recall"
   ],
+
+  "pagePlanning": {
+    "defaultPageCount": 4,
+    "minimumPageCount": 3,
+    "maximumPageCount": 12,
+    "kindsByMode": {
+      "quick": ["overview", "practice"],
+      "deep": ["overview", "module", "module", "deep-dive", "practice", "review"],
+      "production": ["overview", "module", "module", "deep-dive", "practice", "review"],
+      "codebase": ["overview", "module", "deep-dive", "deep-dive", "practice", "review"],
+      "review": ["overview", "practice", "review"]
+    }
+  },
+
   "validation": {
     "failOnBrokenLocalLinks": true,
     "failOnNonMarkdownLearningFiles": true,
@@ -52,6 +81,9 @@
     "requireCoverageMap": true,
     "requireResearchLink": true,
     "requireStableTopicId": true,
-    "requireAstroBuild": true
+    "requireAstroBuild": true,
+    "requireLearningDesignFile": true,
+    "requireObjectiveAssessmentCoverage": true,
+    "requireReviewDirectoryExclusion": true
   }
 }

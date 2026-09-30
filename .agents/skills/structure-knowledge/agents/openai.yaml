@@ -1,0 +1,8 @@
+interface:
+  display_name: "Structure Knowledge"
+  short_description: "Derive objectives, concepts, and page plan"
+  brand_color: "#8B5CF6"
+  default_prompt: "Use $structure-knowledge to derive learning objectives, prerequisites, concepts, and the page plan from a research package."
+
+policy:
+  allow_implicit_invocation: true

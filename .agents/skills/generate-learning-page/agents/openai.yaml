@@ -1,0 +1,8 @@
+interface:
+  display_name: "Generate Learning Page"
+  short_description: "Author one focused learning page"
+  brand_color: "#0EA5E9"
+  default_prompt: "Use $generate-learning-page to author or update one focused learning page against the topic learning design and coverage map."
+
+policy:
+  allow_implicit_invocation: true

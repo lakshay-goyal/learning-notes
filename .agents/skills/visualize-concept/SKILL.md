@@ -1,6 +1,7 @@
 ---
 name: visualize-concept
-description: Select and implement an accurate, accessible visual representation for a researched technical mechanism, architecture, sequence, state change, comparison, algorithm, or code behavior.
+description: "Choose and implement the smallest accurate visual for a specific question."
+invocation: model
 ---
 
 # Visualize Concept

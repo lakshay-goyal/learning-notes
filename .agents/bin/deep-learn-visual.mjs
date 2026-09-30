@@ -14,11 +14,23 @@
  * through `.agents/lib/`.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFrontmatter, FrontmatterError } from '../lib/frontmatter.mjs';
 import { headings, relativeImports, rootRelativeRoutes } from '../lib/markdown.mjs';
+import {
+	FrontmatterError,
+	exceptionFor,
+	isResearchOutputPath,
+	isSafeSlug,
+	loadConfig,
+	loadExceptions,
+	readFrontmatter,
+	relPath,
+	researchSourceFiles,
+	topicSlugs,
+	walkFiles,
+} from '../lib/harness.mjs';
 import {
 	resolvePage,
 	routeForFile,
@@ -34,6 +46,41 @@ const VALID_COVERAGE_STATUSES = new Set(['MAPPED', 'INTENTIONALLY_EXCLUDED']);
 const SOURCE_SECTION_LEVELS = { min: 2, max: 2 };
 /** Destination anchors a coverage row may target: any real heading. */
 const DESTINATION_ANCHOR_LEVELS = { min: 2, max: 6 };
+
+/**
+ * Compile `docs/<slug>/learning.md` into the objective and concept contract.
+ *
+ * The old validator collected `objectiveIds` on pages and did nothing with them:
+ * a page could declare an objective that no assessment anywhere could evidence.
+ * Parsing the design file makes the check possible, so Gate D stops being prose.
+ */
+function parseLearningDesign(content, file) {
+  const meta = readFrontmatter(content, { file });
+  const tableRows = (sectionHeading) => {
+    const start = content.indexOf(sectionHeading);
+    if (start === -1) return [];
+    const rest = content.slice(start + sectionHeading.length);
+    const end = rest.search(/^##\s/m);
+    const body = end === -1 ? rest : rest.slice(0, end);
+    const rows = [];
+    for (const line of body.split(/\r?\n/)) {
+      if (!line.startsWith('|')) continue;
+      const cells = line.slice(1, -1).split('|').map((cell) => cell.trim());
+      if (cells.length < 2 || /^-+$/.test(cells[0]) || cells[0] === 'Objective ID' || cells[0] === 'Concept ID') continue;
+      rows.push(cells);
+    }
+    return rows;
+  };
+
+  const backtickId = (value) => String(value).replaceAll('`', '').trim();
+  const objectives = tableRows('## Objectives').map((cells) => ({ id: backtickId(cells[0]), statement: cells[1] || '' }));
+  const concepts = tableRows('## Concepts').map((cells) => ({
+    id: backtickId(cells[0]),
+    name: cells[1] || '',
+    statement: cells[2] || '',
+  }));
+  return { meta, objectives, concepts };
+}
 
 /** Shape returned for a page whose frontmatter could not be parsed at all. */
 const EMPTY_PAGE = {
@@ -54,6 +101,13 @@ const EMPTY_PAGE = {
 	problems: [],
 	legacy: false,
 };
+
+function assertInside(parent, child) {
+	const rel = relative(resolve(parent), resolve(child));
+	if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || resolve(rel) === rel) {
+		fail(`unsafe path outside ${parent}: ${child}`);
+	}
+}
 
 function fail(message, code = 1) {
 	console.error(`Error: ${message}`);
@@ -76,45 +130,20 @@ function takeFlag(args, name) {
 	return true;
 }
 
-function readJson(path) {
-	try {
-		return JSON.parse(readFileSync(path, 'utf8'));
-	} catch (error) {
-		fail(`cannot read ${path}: ${error.message}`);
-	}
-}
-
 function assertSafeSlug(slug) {
-	if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+	if (!isSafeSlug(slug)) {
 		fail(`invalid topic slug "${slug}"; use lowercase letters, digits, and single hyphens`);
 	}
 }
 
-function assertInside(parent, child) {
-	const rel = relative(resolve(parent), resolve(child));
-	if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || resolve(rel) === rel) {
-		fail(`unsafe path outside ${parent}: ${child}`);
-	}
+/** Topic slugs with a research README, resolved through the shared helper. */
+function researchTopicSlugs(root, config) {
+	return topicSlugs(resolve(root, config.researchDirectory));
 }
 
-function walkFiles(path) {
-	if (!existsSync(path)) return [];
-	const files = [];
-	for (const entry of readdirSync(path, { withFileTypes: true })) {
-		const child = join(path, entry.name);
-		if (entry.isDirectory()) files.push(...walkFiles(child));
-		else if (entry.isFile()) files.push(child);
-	}
-	return files;
-}
-
-function topicSlugs(root, config) {
-	const researchDir = resolve(root, config.researchDirectory);
-	if (!existsSync(researchDir)) return [];
-	return readdirSync(researchDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && existsSync(join(researchDir, entry.name, 'README.md')))
-		.map((entry) => entry.name)
-		.sort();
+/** Research Markdown that participates in coverage, excluding agent output. */
+function coverageSourceFiles(researchDir, config) {
+	return researchSourceFiles(researchDir, config?.requiredLearningDesignFile || 'learning.md');
 }
 
 /**
@@ -200,7 +229,7 @@ function inspectTopic(root, config, slug) {
 	const researchDir = resolve(root, config.researchDirectory, slug);
 	assertInside(resolve(root, config.researchDirectory), researchDir);
 	if (!existsSync(researchDir)) fail(`research topic not found: ${slug}`);
-	const researchFiles = walkFiles(researchDir).filter((file) => extname(file) === '.md');
+	const researchFiles = coverageSourceFiles(researchDir, config);
 	const sourceSections = researchFiles.reduce(
 		(count, file) => count + headings(readFileSync(file, 'utf8'), SOURCE_SECTION_LEVELS).length,
 		0,
@@ -209,17 +238,64 @@ function inspectTopic(root, config, slug) {
 	const coverage = resolve(root, config.coverageDirectory, `${slug}.md`);
 	const visualTemplates = resolve(root, config.visualTemplateDirectory || '.agents/templates/visual');
 
+	// The learning design is the plan the pages are measured against, so `inspect`
+	// must show whether it exists and what it promises.
+	const designFile = join(researchDir, config.requiredLearningDesignFile || 'learning.md');
+	let design = null;
+	if (existsSync(designFile)) {
+		try {
+			design = parseLearningDesign(readFileSync(designFile, 'utf8'), designFile);
+		} catch (error) {
+			if (!(error instanceof FrontmatterError)) throw error;
+			design = { objectives: [], concepts: [], parseError: error.message };
+		}
+	}
+
+	// A page set smaller than the design plans is under-published, and a single
+	// page for a topic that planned several is the mega-page failure the
+	// multi-page contract exists to prevent.
+	const planning = config.pagePlanning || {};
+	const planned = design ? design.meta.pageCount : undefined;
+	const verdict =
+		pages.length === 0
+			? 'research-only'
+			: pages.length === 1 && (planning.minimumPageCount || 3) > 1
+				? `single page for a topic that plans at least ${planning.minimumPageCount}; run migrate-content`
+				: planned && pages.length < planned
+					? `${pages.length} of ${planned} planned pages published`
+					: `${pages.length} page(s) published`;
+
 	console.log(`Topic: ${slug}`);
-	console.log(`Research files: ${researchFiles.length}`);
+	console.log(`Research files: ${researchFiles.length} (agent output under review/ excluded)`);
 	console.log(`Level-two source sections: ${sourceSections}`);
 	console.log(`Publication state: ${publicationState(pages)}`);
-	console.log(`Learning pages: ${pages.length}`);
+	console.log(`Learning design: ${design ? relPath(root, designFile) : 'missing'}`);
+	if (design) {
+		console.log(`  objectives: ${design.objectives.length}, concepts: ${design.concepts.length}, planned pages: ${planned ?? 'unstated'}`);
+	}
+	console.log(`Learning pages: ${pages.length} — ${verdict}`);
 	for (const page of pages) {
 		const role = page.kind ? `${page.kind}${page.legacy ? ' (legacy id-only)' : ''}` : 'unresolved';
-		console.log(`  - ${relative(root, page.file)} (pageId: ${page.pageId ?? 'missing'}, ${role})`);
+		const objectives = page.objectiveIds?.length || 0;
+		const assessments = page.assessmentIds?.length || 0;
+		console.log(
+			`  - ${relPath(root, page.file)} (pageId: ${page.pageId ?? 'missing'}, ${role}, ${objectives} objective(s), ${assessments} assessment(s))`,
+		);
 	}
-	console.log(`Coverage map: ${existsSync(coverage) ? relative(root, coverage) : 'missing'}`);
-	console.log(`Visual templates: ${existsSync(visualTemplates) ? relative(root, visualTemplates) : 'missing'}`);
+	if (design && pages.length) {
+		const assessed = new Set();
+		for (const page of pages) {
+			if (page.assessmentIds?.length) for (const objective of page.objectiveIds || []) assessed.add(objective);
+		}
+		const ids = design.objectives.map((objective) => objective.id);
+		const uncovered = ids.filter((objective) => !assessed.has(objective));
+		console.log(
+			`Objective coverage: ${ids.length - uncovered.length}/${ids.length}` +
+				(uncovered.length ? `; unassessed: ${uncovered.join(', ')}` : ''),
+		);
+	}
+	console.log(`Coverage map: ${existsSync(coverage) ? relPath(root, coverage) : 'missing'}`);
+	console.log(`Visual templates: ${existsSync(visualTemplates) ? relPath(root, visualTemplates) : 'missing'}`);
 }
 
 function validateTopic(root, config, slug, strict) {
@@ -244,7 +320,7 @@ function validateTopic(root, config, slug, strict) {
 		return { errors, warnings, info, sourceSections: 0, rows: 0, state: 'missing' };
 	}
 
-	const researchFiles = walkFiles(researchDir).filter((file) => extname(file).toLowerCase() === '.md');
+	const researchFiles = coverageSourceFiles(researchDir, config);
 	const readme = join(researchDir, 'README.md');
 	if (!existsSync(readme)) {
 		report('error', readme, 'research README is missing');
@@ -287,6 +363,10 @@ function validateTopic(root, config, slug, strict) {
 		if (page.parseError) report('error', page.file, page.parseError);
 	}
 
+	const rules = config.validation || {};
+	const exceptions = loadExceptions(root, config);
+	const learningPagesForTopic = pages;
+
 	if (state === 'research-only') {
 		report(
 			'info',
@@ -295,10 +375,11 @@ function validateTopic(root, config, slug, strict) {
 		);
 	} else {
 		const overviews = pages.filter((page) => page.kind === 'overview');
+		const researchPrefix = config.researchRoutePrefix || '/research';
 		for (const page of pages) {
 			if (!page.id) report('error', page.file, 'learning.id is missing');
-			if (!page.content.includes(`/research/${slug}/`)) {
-				report('error', page.file, `must link to /research/${slug}/`);
+			if (rules.requireResearchLink && !page.content.includes(`${researchPrefix}/${slug}/`)) {
+				report('error', page.file, `must link to ${researchPrefix}/${slug}/`);
 			}
 			if (strict && /\{\{[A-Z_]+\}\}|<!--\s*TODO/i.test(page.content)) {
 				report('error', page.file, 'contains unfinished template markers');
@@ -316,8 +397,26 @@ function validateTopic(root, config, slug, strict) {
 				report('error', page.file, `derived route does not resolve: ${declared}`);
 			}
 		}
+
+		// Gate D: an objective nobody can be assessed on is a claim, not an
+		// objective. Only enforced once the topic has a learning design file to
+		// compare against.
+		const objectiveReport = validateObjectiveCoverage({
+			root,
+			config,
+			slug,
+			researchDir,
+			pages: learningPagesForTopic,
+			report,
+			strict,
+		});
+
 		if (overviews.length === 1) {
-			report('info', researchDir, `publication state published with ${pages.length} page(s), 1 overview.`);
+			report(
+				'info',
+				researchDir,
+				`publication state published with ${pages.length} page(s), 1 overview, objective coverage ${objectiveReport.covered}/${objectiveReport.total}.`,
+			);
 		}
 	}
 
@@ -329,7 +428,7 @@ function validateTopic(root, config, slug, strict) {
 			return { errors, warnings, info, sourceSections: 0, rows: 0, state };
 		}
 	} else {
-		validateCoverage({ root, researchDir, researchFiles, coveragePath, strict, report });
+		validateCoverage({ root, config, researchDir, researchFiles, coveragePath, strict, report });
 	}
 
 	const rows = existsSync(coveragePath) ? parseCoverage(readFileSync(coveragePath, 'utf8')).length : 0;
@@ -340,12 +439,96 @@ function validateTopic(root, config, slug, strict) {
 	return { errors, warnings, info, sourceSections, rows, state };
 }
 
-function validateCoverage({ root, researchDir, researchFiles, coveragePath, strict, report }) {
+/**
+ * Gate D: every declared objective must resolve to an assessment somewhere in
+ * the topic, and every page must carry at least one objective and one
+ * assessment.
+ *
+ * The objective set comes from `docs/<slug>/learning.md`, the machine-readable
+ * learning design. That is what makes this check possible: previously the pages
+ * declared `objectiveIds`, nothing read them, and a topic could claim any number
+ * of objectives while assessing none of them.
+ *
+ * Returns the coverage ratio so `inspect` and `--json` can report it.
+ */
+function validateObjectiveCoverage({ root, config, slug, researchDir, pages, report, strict }) {
+  const designFile = join(researchDir, config.requiredLearningDesignFile || 'learning.md');
+  if (!existsSync(designFile)) {
+    return { total: 0, covered: 0, ratio: null };
+  }
+
+  let design;
+  try {
+    design = parseLearningDesign(readFileSync(designFile, 'utf8'), designFile);
+  } catch (error) {
+    if (error instanceof FrontmatterError) report('error', designFile, error.message);
+    return { total: 0, covered: 0, ratio: null };
+  }
+
+  const objectives = design.objectives.map((objective) => objective.id).filter(Boolean);
+  const conceptIds = new Set(design.concepts.map((concept) => concept.id).filter(Boolean));
+
+  if (objectives.length === 0) {
+    report('error', designFile, 'learning design declares no objectives; a topic needs at least one observable outcome');
+    return { total: 0, covered: 0, ratio: null };
+  }
+
+  const assessed = new Set();
+  const declaredObjectives = new Set();
+  for (const page of pages) {
+    const declared = page.objectiveIds || [];
+    const assessedHere = page.assessmentIds || [];
+    if (declared.length === 0) {
+      report('error', page.file, `page "${page.pageId}" declares no learning.objectiveIds; every page must say what it teaches`);
+    }
+    if (assessedHere.length === 0) {
+      report('error', page.file, `page "${page.pageId}" declares no learning.assessmentIds; every page must say how it is assessed`);
+    }
+    for (const objective of declared) {
+      declaredObjectives.add(objective);
+      if (!objectives.includes(objective)) {
+        report('error', page.file, `learning.objectiveIds "${objective}" is not declared in ${config.requiredLearningDesignFile || 'learning.md'}`);
+      }
+    }
+    // An assessment attached to a page evidences that page's objectives.
+    for (const objective of declared) {
+      if (assessedHere.length > 0) assessed.add(objective);
+    }
+    for (const concept of page.conceptIds || []) {
+      if (conceptIds.size > 0 && !conceptIds.has(concept)) {
+        report('error', page.file, `learning.conceptIds "${concept}" is not declared in ${config.requiredLearningDesignFile || 'learning.md'}`);
+      }
+    }
+  }
+
+  const uncovered = objectives.filter((objective) => !assessed.has(objective));
+  const rule = config.validation?.requireObjectiveAssessmentCoverage !== false;
+  if (uncovered.length && rule) {
+    const level = strict ? 'error' : 'warning';
+    report(
+      level,
+      designFile,
+      `${uncovered.length} of ${objectives.length} objectives have no assessment: ${uncovered.join(', ')}`,
+    );
+  }
+  const unused = [...declaredObjectives].filter((objective) => !objectives.includes(objective));
+  if (unused.length) {
+    report('warning', designFile, `pages declare objectives the design does not list: ${unused.join(', ')}`);
+  }
+
+  return {
+    total: objectives.length,
+    covered: objectives.length - uncovered.length,
+    ratio: objectives.length ? (objectives.length - uncovered.length) / objectives.length : null,
+  };
+}
+
+function validateCoverage({ root, config, researchDir, researchFiles, coveragePath, strict, report }) {
 	const rows = parseCoverage(readFileSync(coveragePath, 'utf8'));
 	const rowKeys = new Set(rows.map((row) => `${row.sourceFile}::${row.sourceSection}`));
 	const sourceKeys = [];
 	for (const file of researchFiles) {
-		const sourceFile = relative(researchDir, file);
+		const sourceFile = relPath(researchDir, file);
 		for (const heading of headings(readFileSync(file, 'utf8'), SOURCE_SECTION_LEVELS)) {
 			const key = `${sourceFile}::${heading.text}`;
 			sourceKeys.push(key);
@@ -357,6 +540,15 @@ function validateCoverage({ root, researchDir, researchFiles, coveragePath, stri
 		const source = join(researchDir, row.sourceFile);
 		if (!existsSync(source)) {
 			report('error', coveragePath, `coverage row references missing source file: ${row.sourceFile}`);
+			continue;
+		}
+		// A coverage row for agent output is a stale row: `review-learning`
+		// rewrites `docs/<slug>/review/review.md`, so mapping its headings would
+		// re-break the map on the next review.
+		if (isResearchOutputPath(row.sourceFile)) {
+			if (config.requireReviewOutputExclusion !== false) {
+				report('error', coveragePath, `coverage row targets agent output, not research source: ${row.sourceFile}`);
+			}
 			continue;
 		}
 		const sourceHeadings = headings(readFileSync(source, 'utf8'), SOURCE_SECTION_LEVELS).map((h) => h.text);
@@ -419,18 +611,54 @@ function runValidation(root, config, slugs, strict, { json = false, allTopics = 
 	const allPages = learningPages(root, config);
 	const pages = allTopics ? allPages : allPages.filter((page) => slugs.includes(page.researchSlug));
 	const routes = pageRoutes(root, config, pages);
-	const availableResearchSlugs = topicSlugs(root, config);
+	const availableResearchSlugs = researchTopicSlugs(root, config);
 	const researchSlugs = new Set(
 		allTopics ? availableResearchSlugs : availableResearchSlugs.filter((slug) => slugs.includes(slug)),
 	);
-	for (const problem of validateGlobalContract(pages, {
+	const exceptions = loadExceptions(root, config);
+	const acknowledgedTargets = new Set(
+		exceptions.entries.flatMap((entry) => (entry.targets || []).map((target) => resolve(root, target))),
+	);
+	const globalProblems = validateGlobalContract(pages, {
 		routes,
 		researchSlugs,
-	})) {
+		acknowledgedTargets,
+	});
+	for (const message of globalProblems.acknowledged || []) {
+		report.push({ level: 'info', slug: '*', message });
+	}
+	for (const problem of globalProblems) {
 		report.push({ level: 'error', slug: '*', message: problem });
 	}
 	errorCount += report.filter((item) => item.level === 'error').length;
 	warningCount += report.filter((item) => item.level === 'warning').length;
+
+	// Objective coverage across every published topic, so the learning-outcome
+	// number is visible in one place rather than only per-topic.
+	const objectiveTotals = { total: 0, covered: 0 };
+	for (const slug of slugs) {
+		const researchDir = resolve(root, config.researchDirectory, slug);
+		const designFile = join(researchDir, config.requiredLearningDesignFile || 'learning.md');
+		if (!existsSync(designFile)) continue;
+		const topicPages = allPages.filter((page) => page.researchSlug === slug);
+		// Messages collected here are already surfaced by the per-topic pass above, so
+	// the aggregate only counts totals. `validateObjectiveCoverage` uses the same
+	// reporter shape as the topic validator, including 'info'.
+		const push = () => {};
+		const result = validateObjectiveCoverage({
+			root,
+			config,
+			slug,
+			researchDir,
+			pages: topicPages,
+			report: push,
+			strict: false,
+		});
+		objectiveTotals.total += result.total;
+		objectiveTotals.covered += result.covered;
+	}
+	const objectiveRatio =
+		objectiveTotals.total > 0 ? objectiveTotals.covered / objectiveTotals.total : null;
 
 	if (json) {
 		console.log(
@@ -441,7 +669,17 @@ function runValidation(root, config, slugs, strict, { json = false, allTopics = 
 					errors: report.filter((item) => item.level === 'error'),
 					warnings: report.filter((item) => item.level === 'warning'),
 					info: report.filter((item) => item.level === 'info'),
-					summary: { errors: errorCount, warnings: warningCount, sourceSections: sectionCount, coverageRows: rowCount },
+					summary: {
+						errors: errorCount,
+						warnings: warningCount,
+						sourceSections: sectionCount,
+						coverageRows: rowCount,
+						objectiveCoverage: {
+							total: objectiveTotals.total,
+							covered: objectiveTotals.covered,
+							ratio: objectiveRatio,
+						},
+					},
 				},
 				null,
 				2,
@@ -453,13 +691,19 @@ function runValidation(root, config, slugs, strict, { json = false, allTopics = 
 			else if (item.level === 'warning') console.warn(`Warning: ${item.message}`);
 			else console.log(`Note: ${item.message}`);
 		}
+		const objectiveSuffix =
+			objectiveRatio === null
+				? ''
+				: `, objective coverage ${objectiveTotals.covered}/${objectiveTotals.total} (${Math.round(objectiveRatio * 100)}%)`;
 		if (errorCount) {
-			console.error(`Learning validation failed with ${errorCount} error(s) and ${warningCount} warning(s).`);
+			console.error(
+				`Learning validation failed with ${errorCount} error(s) and ${warningCount} warning(s)${objectiveSuffix}.`,
+			);
 		} else {
 			const researchOnly = [...states].filter(([, state]) => state === 'research-only').map(([slug]) => slug);
 			const suffix = researchOnly.length ? ` (${researchOnly.length} research-only: ${researchOnly.join(', ')})` : '';
 			console.log(
-				`Learning validation passed for ${slugs.length} topic(s): ${sectionCount} source sections, ${rowCount} coverage rows, ${warningCount} warning(s)${suffix}.`,
+				`Learning validation passed for ${slugs.length} topic(s): ${sectionCount} source sections, ${rowCount} coverage rows, ${warningCount} warning(s)${objectiveSuffix}${suffix}.`,
 			);
 		}
 	}
@@ -496,7 +740,12 @@ const args = process.argv.slice(2);
 const root = resolve(takeOption(args, '--root') || SCRIPT_ROOT);
 const configPath = join(root, '.agents/config.json');
 if (!existsSync(configPath)) fail(`DeepLearn Visual config not found: ${configPath}`);
-const config = readJson(configPath);
+let config;
+try {
+	config = loadConfig(root);
+} catch (error) {
+	fail(error.message);
+}
 const command = args.shift();
 
 switch (command) {
@@ -519,7 +768,7 @@ switch (command) {
 		const json = takeFlag(args, '--json');
 		const slug = args.shift();
 		if (args.length || (all && slug) || (!all && !slug)) fail('validate requires one topic slug or --all');
-		const slugs = all ? topicSlugs(root, config) : [slug];
+		const slugs = all ? researchTopicSlugs(root, config) : [slug];
 		if (!slugs.length) fail('no research topics found');
 		runValidation(root, config, slugs, strict, { json, allTopics: all });
 		break;

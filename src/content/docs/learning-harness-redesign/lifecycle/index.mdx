@@ -1,0 +1,190 @@
+---
+title: Learning lifecycle · Learning Harness Redesign
+description: Route an intent to the right workflow, name that workflow's success measure, and understand why interleaving retrieval beats one quiz at the end.
+tags: [visual, diagrams]
+learning:
+  id: learning-harness-redesign-lifecycle
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign-lifecycle
+  kind: module
+  order: 4
+  level: visual-understanding
+  category: Learning Systems
+  difficulty: intermediate
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.trace-mechanism
+  assessmentIds:
+    - learning-harness-redesign.lifecycle-check
+  conceptIds:
+    - learning-harness-redesign.lifecycle
+  labIds: []
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [technical-writing]
+  toolIds: []
+  prerequisites: []
+  relations: []
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import QuickRecall from '../../../../components/learning/QuickRecall.astro';
+import ExecutionTimeline from '../../../../components/learning/ExecutionTimeline.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Intermediate"
+  version="Snapshot 42b3f13"
+  prerequisites={['The page model']}
+  researchHref="/research/learning-harness-redesign/modules/04-learning-lifecycle/"
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+<QuickRecall
+  definition="The learning lifecycle: ten stages from intent to maintenance, each with its own write permissions and its own success measure. Routing happens before any file is written."
+  problem="The harness treated 'teach me' as a request to create a complete research package, so an ordinary question produced six files and a source ledger."
+  mentalModel="Different intents need different write scopes and different success measures. A workflow is defined by what it is allowed to change and how you know it worked."
+  takeaways={[
+    'Explain, research, publish, review, and maintain are five workflows, not one.',
+    'A question that needs no files should stop before the scaffold.',
+    'Each workflow has a different definition of done.',
+  ]}
+  whenToUse="When deciding which workflow a request belongs to."
+/>
+
+## The missing distinction
+
+A learner may want to:
+
+1. understand a concept now
+2. save a source-backed note
+3. publish a visual lesson
+4. practise an implementation
+5. be questioned on the topic
+6. maintain the topic when versions change
+
+Those are six workflows with six different write permissions and six different
+success measures. Collapsing them is why a normal explanation produced a research
+package.
+
+## The lifecycle
+
+<ExecutionTimeline
+  title="A topic from request to maintenance"
+  question="What has to be true before the next stage begins?"
+  steps={[
+    { title: 'Intent', detail: 'Classify the request before choosing a skill.', result: 'An explanation stops here; no files.' },
+    { title: 'Conversation', detail: 'Explain the mental model, confirm depth.' },
+    { title: 'Plan', detail: 'Outcomes, scope, evidence, non-goals.', result: 'A learning design, not a file list.' },
+    { title: 'Research', detail: 'Primary evidence, version boundaries, failure behaviour.' },
+    { title: 'Knowledge model', detail: 'Concepts, dependencies, misconceptions, objectives, assessments.', result: 'Prose can now be derived.' },
+    { title: 'Writing', detail: 'Default scan path plus deeper pages.' },
+    { title: 'Labs', detail: 'Artifacts producing evidence: code, a test, a pinned commit, a decision.' },
+    { title: 'Assessment', detail: 'Explain, predict, debug, implement, design, transfer.', result: 'Interleaved, not deferred to one block.' },
+    { title: 'Spaced review', detail: 'Retrieval scheduled from recorded answers.' },
+    { title: 'Maintenance', detail: 'Re-verify version-sensitive claims, update affected pages, preserve routes.' },
+  ]}
+/>
+
+The order is not arbitrary. Stage 5 before stage 6 because prose written before
+the knowledge model is prose that has to be rewritten. Stage 8 interleaves with
+stages 6 and 7 rather than following them, because retrieval only works when it
+interrupts.
+
+## Progressive disclosure
+
+| Level | Learner job | Best representation |
+| --- | --- | --- |
+| Quick recall | decide whether to invest | short definition and use condition |
+| Visual understanding | build a mental model | mechanism, flow, diagram, worked example |
+| Complete understanding | go deep | module, deep dive, original research |
+| Active recall | prove retrieval | interleaved checks and a review page |
+
+A topic index should not contain every deep dive inline. Link and disclose.
+
+## Interleaving practice
+
+Placing all recall checks at the end makes a page a final exam. Predicting
+*immediately after* the mechanism is what forces reconstruction:
+
+```text
+Teach protocol discovery
+  → learner predicts what happens when the tool is missing
+  → reveal the behaviour
+  → continue to schema validation
+  → learner predicts which surface reports invalid input
+```
+
+Recognition is what a deferred quiz measures. Reconstruction is what interleaving
+measures, and reconstruction is closer to using the thing.
+
+<Aside type="tip" title="Keep one consolidated review">
+  Interleave during the topic and keep one consolidated review page for the
+  delayed pass. Both: retrieval while fresh, retrieval after a delay.
+</Aside>
+
+## The learning evidence ladder
+
+| Evidence | Proves | Does not prove |
+| --- | --- | --- |
+| Read the page | exposure | understanding |
+| Answer a recall question | retrieval of a claim | transfer |
+| Pass a prediction question | mechanism reasoning | implementation skill |
+| Run a lab | applied capability in one context | broad mastery |
+| Design a novel solution | transfer and judgement | long-term retention |
+| Recall after a delay | retention | automatic real-world performance |
+
+The dashboard should show these distinctions rather than treating all activity as
+"learned". That is why the revision panel reports answered prompts and not a
+mastery state.
+
+## Anti-overload rules
+
+- Mental model before source detail.
+- Short default scan path.
+- A visual only where it answers a question.
+- Split by learning job, not length.
+- One next step per page.
+- Research evidence reachable without sitting in the default path.
+- Never repeat one definition across overview, module, and review.
+
+## Test yourself
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="lifecycle-check"
+  category="prediction"
+  prompt="A user says: 'Teach me Redis Streams, save it, make it visual, quiz me, and build a consumer-group lab.' What happens first, and what can run in parallel?"
+  answer="First: a bounded conversation and a research plan. After the plan is stable, source research and prerequisite analysis run in parallel. Module authoring and lab design proceed in separate ownership areas. Publishing waits for validated content. Quizzes are derived from objectives, and learner evidence stays out of the research package."
+  misconception="Starting the visual pages immediately, before any evidence exists to publish."
+  reviewHref="#the-lifecycle"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="evidence-vs-activity"
+  category="understanding"
+  prompt="Which of these proves the most, and which proves the least: reading the page, answering a recall prompt, running a lab, designing a novel solution?"
+  answer="Designing a novel solution proves the most — transfer and judgement. Reading the page proves the least — exposure only. The ordering matters because a dashboard that treats them as equivalent is claiming mastery from activity."
+  misconception="Treating page views, prompt answers, and completed labs as one 'progress' number."
+  reviewHref="#the-learning-evidence-ladder"
+/>
+
+## Where next
+
+<CardGrid>
+  <Card title="Quality gates" icon="shield">
+    Which gate catches a given failure, and what its error must say.
+    [Next →](../gates/)
+  </Card>
+  <Card title="Back to the overview" icon="home">
+    [Overview →](../)
+  </Card>
+</CardGrid>
+
+Full chapter: [Module 4 · Learning lifecycle](/research/learning-harness-redesign/modules/04-learning-lifecycle/)

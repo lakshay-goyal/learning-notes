@@ -1,0 +1,199 @@
+---
+title: Practice · Learning Harness Redesign
+description: Apply the topic, page, and objective contracts to a real topic, then migrate it without losing content or breaking a route.
+tags: [quiz]
+learning:
+  id: learning-harness-redesign-practice
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign-practice
+  kind: practice
+  order: 6
+  level: active-recall
+  category: Learning Systems
+  difficulty: advanced
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.apply-practice
+    - learning-harness-redesign.diagnose-failure
+  assessmentIds:
+    - learning-harness-redesign.apply-check
+  conceptIds:
+    - learning-harness-redesign.cardinality
+    - learning-harness-redesign.gates
+  labIds:
+    - learning-harness-redesign.scaffold-lab
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [testing]
+  toolIds: []
+  prerequisites: ['The page model', 'Quality gates']
+  relations: []
+---
+
+import { Aside, Card, CardGrid, Steps } from '@astrojs/starlight/components';
+import QuickRecall from '../../../../components/learning/QuickRecall.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Advanced"
+  version="Snapshot 42b3f13"
+  prerequisites={['The page model', 'Quality gates']}
+  researchHref="/research/learning-harness-redesign/exercises/"
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+<QuickRecall
+  definition="A lab: a bounded artifact that produces evidence. Code, a test, a pinned commit, a reproduced failure, or an architecture decision."
+  problem="Markdown exercises describe possible work. Without a lab there is nothing to inspect, so a review can only report what the notes claim."
+  mentalModel="If a learner could have produced this and you cannot see it, it is not evidence. Ask for the artifact, not the account of it."
+  takeaways={[
+    'An exercise prompts; a lab produces.',
+    'Migrate content with a fixture first and real content second.',
+    'Coverage rows are part of the artifact, not an afterthought.',
+  ]}
+  whenToUse="When you need to prove a claim about how the system behaves, not that it was described."
+/>
+
+## Lab 1 — scaffold and inspect
+
+Produce evidence that a topic plans itself into multiple pages.
+
+<Steps>
+  1. Scaffold a topic in an isolated root:
+     ```bash
+     mkdir -p /tmp/lab/.agents /tmp/lab/docs
+     cp .agents/config.json /tmp/lab/.agents/
+     cp -r .agents/templates /tmp/lab/.agents/
+     printf '# K\n\n<!-- DEEP_LEARN_INDEX_START -->\n<!-- DEEP_LEARN_INDEX_END -->\n' \
+       > /tmp/lab/docs/README.md
+
+     node .agents/bin/deep-learn.mjs new "Vector Embeddings" --mode deep --root /tmp/lab
+     ```
+  2. Read the generated learning design:
+     ```bash
+     cat /tmp/lab/docs/vector-embeddings/learning.md
+     ```
+  3. Record the evidence: how many objectives, how many concepts, how many planned
+     pages, and whether every `pageId` is unique.
+  4. Prove the bound holds. Set `pagePlanning.maximumPageCount` to 3 in the copied
+     config, scaffold again, and confirm the plan is clamped to 3.
+  5. Prove the design is required. Delete `learning.md` and run:
+     ```bash
+     node .agents/bin/deep-learn.mjs validate vector-embeddings --root /tmp/lab
+     ```
+     Expect a failure naming the missing learning design.
+</Steps>
+
+<Aside type="tip" title="What to record">
+  The command output and your observation of it. "It produced 6 pages" is a claim;
+  the pasted table is the evidence.
+</Aside>
+
+## Lab 2 — find the accidental architecture
+
+<Steps>
+  1. Pick a constraint in the harness that surprised you.
+  2. Answer the five questions:
+     - Which file or schema forces this shape?
+     - Which validator rejects the alternative?
+     - Which component assumes it at runtime?
+     - Which documentation claims an enforcement the code lacks?
+     - Can a small fixture prove the alternative?
+  3. Write the fixture and run it.
+  4. Decide: is this a deliberate decision that should be enforced harder, or an
+     accident that should be removed?
+</Steps>
+
+A worked example: `.agents/config.json` carried 22 keys no code read, and
+`doctor` reported zero warnings because the check scanned an archived config
+snapshot that repeated every key name. The answer to question 4 was "the
+documentation claims enforcement the code does not provide".
+
+## Lab 3 — migrate without losing content
+
+<Steps>
+  1. Run `node .agents/bin/deep-learn-visual.mjs inspect <slug>` and record the
+     current page count and objective coverage.
+  2. Write the page plan. For every planned page, name the question it answers.
+  3. Create the overview. It keeps quick recall, the mental model, three
+     takeaways, use conditions, and one next step.
+  4. Move prose into child pages **by cut, not rewrite.** Sentences stay intact.
+  5. Update `learning.md` first if the plan changed, then the pages.
+  6. Rebuild the coverage map: one row per research level-two heading, `MAPPED`
+     with a real anchor or `INTENTIONALLY_EXCLUDED` with a stated reason.
+  7. Run the gate in order and stop at the first failing layer:
+     ```bash
+     node .agents/bin/harness.mjs check --layer=static
+     node .agents/bin/harness.mjs check --layer=runtime
+     node .agents/bin/harness.mjs receipt <slug>
+     ```
+</Steps>
+
+## Lab 4 — design the failure table
+
+Pick a system you know well. For each failure below, name the gate that must
+catch it and the exact error message it should produce.
+
+| Failure | Your gate | Your error message |
+| --- | --- | --- |
+| Two pages share a `pageId` | | |
+| A page points to missing research | | |
+| An objective has no assessment | | |
+| A cited source was never opened | | |
+| A learner has local storage disabled | | |
+| A feature is marked done with no evidence | | |
+
+An error message should carry the repair, not just the failure:
+
+```text
+Test failed.
+```
+
+```text
+node .agents/bin/harness.mjs check: FAIL static.
+  fail node .agents/bin/deep-learn-visual.mjs validate --all --strict
+       Error: src/content/docs/x/index.mdx: declares no learning.assessmentIds;
+              page "x-module" must say how it is assessed.
+SKIPPED (an earlier layer failed): runtime, system
+```
+
+## Check your work
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="apply-check"
+  category="application"
+  prompt="You scaffolded a topic in deep mode. It produced 6 planned pages, and two of them share the pageId `topic-module`. What happened, and what does the harness do about it?"
+  answer="The plan is derived from page kinds, and two pages shared a kind. The generator suffixes duplicates with an ordinal (`topic-module-2`), and the validator independently rejects any duplicate `pageId`. Before the fix, the scaffold produced two pages that could never pass validation."
+  misconception="Treating a green scaffolder as proof the output is valid; the scaffolder and the validator are separate checks."
+  reviewHref="#lab-1--scaffold-and-inspect"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="lab-or-exercise"
+  category="understanding"
+  prompt="Your research package has five exercises. None has produced a file, a test, or a recorded decision. What do you have, and what do you lack?"
+  answer="You have five exercises: prompts describing possible work. You lack evidence: no artifact a reviewer can inspect. Coverage is not learning. The labs exist to turn prompts into artifacts."
+  misconception="Counting completed exercises as demonstrated competence."
+  reviewHref="#lab-1--scaffold-and-inspect"
+/>
+
+## Where next
+
+<CardGrid>
+  <Card title="Retrieval review" icon="refresh">
+    Seven levels of progressive recall, from mental model to transfer.
+    [Review →](../review/)
+  </Card>
+  <Card title="Back to the overview" icon="home">
+    [Overview →](../)
+  </Card>
+</CardGrid>
+
+Full workshop: [Exercises and workshop](/research/learning-harness-redesign/exercises/)

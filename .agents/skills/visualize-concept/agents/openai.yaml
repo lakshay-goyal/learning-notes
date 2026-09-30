@@ -1,0 +1,8 @@
+interface:
+  display_name: "Visualize Concept"
+  short_description: "Pick and build an accurate visual"
+  brand_color: "#14B8A6"
+  default_prompt: "Use $visualize-concept to choose and implement the smallest accurate visual that answers a specific learner question."
+
+policy:
+  allow_implicit_invocation: true

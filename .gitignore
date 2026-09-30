@@ -6,6 +6,10 @@ dist/
 # dependencies
 node_modules/
 
+# harness run artifacts. A receipt records one verification at one commit; it is
+# evidence for a report, not a source file.
+.agents/evidence/
+
 # logs
 npm-debug.log*
 yarn-debug.log*

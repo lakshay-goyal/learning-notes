@@ -1,0 +1,179 @@
+---
+title: Content ontology · Learning Harness Redesign
+description: Domain, field, skill, topic, module, page, concept, lab, assessment — which entities a learning harness must distinguish, and which relationships should be hierarchical.
+tags: [visual, diagrams]
+learning:
+  id: learning-harness-redesign-ontology
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign-ontology
+  kind: module
+  order: 2
+  level: visual-understanding
+  category: Learning Systems
+  difficulty: intermediate
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.apply-practice
+  assessmentIds:
+    - learning-harness-redesign.ontology-check
+  conceptIds:
+    - learning-harness-redesign.ontology
+  labIds: []
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [technical-writing]
+  toolIds: []
+  prerequisites: []
+  relations: []
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import QuickRecall from '../../../../components/learning/QuickRecall.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Intermediate"
+  version="Snapshot 42b3f13"
+  prerequisites={['Basic TypeScript']}
+  researchHref="/research/learning-harness-redesign/modules/02-content-ontology/"
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+<QuickRecall
+  definition="Content ontology: the set of distinct entities a learning system stores, and the relationships between them. Get these wrong and every downstream decision is arbitrary."
+  problem="A folder tree is convenient for humans and a poor database. Topics belong to several fields, skills cross domains, and one concept is reused by many topics."
+  mentalModel="Ask what a thing *is* before asking where it lives. A thing that belongs to many parents needs a stable ID and a relationship, not a folder."
+  takeaways={[
+    'Domain, field, and skill are different levels and were being mixed in one list.',
+    'Hierarchical for navigation, many-to-many for meaning.',
+    'Stable IDs survive relabelling; routes do not.',
+  ]}
+  whenToUse="When a knowledge base starts duplicating pages or forcing arbitrary placements."
+/>
+
+## The problem with one folder tree
+
+A folder tree is useful for human navigation and a poor universal database:
+
+- `AI Engineering` behaves like a domain.
+- `System Design` behaves like a field or a skill.
+- `DevOps` can be a field or a practice.
+- `Tools` is a container, not a knowledge domain.
+- `Git`, `Linux`, and `Docker` are tools or topics.
+
+Placing every entity in one tree creates duplicate pages and arbitrary decisions.
+
+## The canonical entities
+
+| Entity | Is | Stable ID | Hierarchical? |
+| --- | --- | --- | --- |
+| **Domain** | a broad area of practice, such as AI engineering | yes | top of navigation |
+| **Field** | a specialty inside a domain | yes | under a domain |
+| **Skill** | something a learner can do | yes | many-to-many with topics |
+| **Tool** | software a topic teaches | yes | many-to-many with topics |
+| **Topic** | a bounded learning contract | yes | under a field |
+| **Module** | one chapter of research | inherits topic | under a topic |
+| **Page** | one focused delivery unit | yes | under a topic, by learning job |
+| **Concept** | an idea the learner operates on | yes | under any number of topics |
+| **Lab** | an executable artifact producing evidence | yes | attached to objectives |
+| **Assessment** | an activity evidencing an objective | yes | attached to objectives |
+
+<Aside type="caution" title="Module means two things">
+  A **research module** is a chapter under `docs/<slug>/modules/`. A **module
+  page** is a published page whose `learning.kind` is `module`. They are never the
+  same thing, and the harness vocabulary now says so in
+  <a href="/research/learning-harness-redesign/">.agents/GLOSSARY.md</a>.
+</Aside>
+
+## Which relationships are hierarchical
+
+Use a hierarchy where a reader genuinely navigates one path:
+
+```text
+domain → field → topic → page
+```
+
+Use many-to-many where meaning does not fit a tree:
+
+```text
+skill    ↔ topic
+tool     ↔ topic
+concept  ↔ topic
+path     ↔ topic
+```
+
+A topic about PostgreSQL index selection belongs to one field but uses two tools,
+teaches three skills, and reuses concepts from database fundamentals. A tree
+forces it to pick one parent and lose the rest.
+
+## Why stable IDs matter
+
+A route is a location. An ID is a name.
+
+```text
+Route:  /ai-engineering/model-context-protocol/       may change
+ID:     ai-engineering                                does not
+```
+
+Relationships must reference IDs, not routes or labels. Renaming a label or moving
+a route then updates navigation without touching a single relationship, and a
+broken destination is detectable instead of silently wrong.
+
+The harness enforces this: every taxonomy ID must exist in
+`.agents/registry/taxonomy.json`, and the visual validator rejects an unknown one.
+
+## Path design
+
+A learning path is an ordered list of topics, not a folder. The same topic belongs
+to several paths, and a path can be generated per goal rather than stored once:
+
+```text
+"ship a production API"
+  → HTTP semantics → authentication → database migrations → observability
+
+"understand vector search"
+  → embeddings → indexing → retrieval → evaluation
+```
+
+Both paths reuse topics. Neither is a directory.
+
+## Test yourself
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="ontology-check"
+  category="application"
+  prompt="A topic teaches Kafka consumer groups. It uses three tools, teaches debugging, and reuses a concept from an existing Kafka topic. Which relationships are hierarchical and which are many-to-many?"
+  answer="Hierarchical: the topic sits under one field, which sits under a domain. Many-to-many: the three tools, the debugging skill, the reused concept, and any learning paths containing it. Forcing the tools into the tree would mean duplicating the topic three times."
+  misconception="Duplicating a topic per tool to preserve the tree, then ending up with three pages that drift apart."
+  reviewHref="#which-relationships-are-hierarchical"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="id-versus-route"
+  category="understanding"
+  prompt="Why must a relationship reference a stable ID rather than a route?"
+  answer="A route is a location and can change when a label or taxonomy moves. An ID is a name and survives that move. Referencing routes means every reorganisation silently breaks relationships instead of failing visibly."
+  misconception="Assuming a route is stable because it is currently valid."
+  reviewHref="#why-stable-ids-matter"
+/>
+
+## Where next
+
+<CardGrid>
+  <Card title="The page model" icon="copy">
+    When a topic needs child pages, and how to split without losing content.
+    [Next →](../page-model/)
+  </Card>
+  <Card title="Back to the overview" icon="home">
+    [Overview →](../)
+  </Card>
+</CardGrid>
+
+Full chapter: [Module 2 · Content ontology](/research/learning-harness-redesign/modules/02-content-ontology/)

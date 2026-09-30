@@ -1,6 +1,7 @@
 ---
 name: connect-knowledge
-description: Add and validate meaningful stable-ID relationships between published learning topics, prerequisites, categories, alternatives, implementations, and applications without keyword-only links.
+description: "Add stable-ID relationships between published topics where routes exist."
+invocation: model
 ---
 
 # Connect Knowledge

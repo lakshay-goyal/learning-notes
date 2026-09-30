@@ -227,8 +227,15 @@ function short(file) {
  *   - every page route is unique
  *   - every page's `researchSlug` resolves to a real research topic
  */
-export function validateGlobalContract(pages, { routes = new Map(), researchSlugs = new Set() } = {}) {
+/**
+ * @param acknowledgedTargets absolute paths recorded in
+ *   `.agents/state/exceptions.json`. An orphan that was deliberately preserved
+ *   is reported as acknowledged rather than as an unknown failure, so a red gate
+ *   always means something new.
+ */
+export function validateGlobalContract(pages, { routes = new Map(), researchSlugs = new Set(), acknowledgedTargets = new Set() } = {}) {
 	const problems = [];
+	const acknowledged = [];
 	const seenPageIds = new Map();
 	const topicToResearch = new Map();
 	const seenRoutes = new Map();
@@ -265,12 +272,21 @@ export function validateGlobalContract(pages, { routes = new Map(), researchSlug
 		}
 
 		if (page.researchSlug && researchSlugs && !researchSlugs.has(page.researchSlug)) {
-			problems.push(
-				`orphan learning page: ${short(page.file)} references research topic "${page.researchSlug}", which has no docs/<slug>/README.md`,
-			);
+			// Acknowledged orphans are returned separately rather than dropped, so
+			// a caller can surface them without failing the run.
+			if (acknowledgedTargets.size === 0 || !acknowledgedTargets.has(page.file)) {
+				problems.push(
+					`orphan learning page: ${short(page.file)} references research topic "${page.researchSlug}", which has no docs/<slug>/README.md`,
+				);
+			} else {
+				acknowledged.push(
+					`${short(page.file)} is an acknowledged orphan: research topic "${page.researchSlug}" was deliberately removed`,
+				);
+			}
 		}
 	}
 
+	problems.acknowledged = acknowledged;
 	return problems;
 }
 

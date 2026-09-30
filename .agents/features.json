@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "updated": "2026-10-01",
+  "note": "The feature list. Every feature carries exactly three things: the observable behavior, the verification command that proves it, and the current state. Only a passing verification command may set `done` \u2014 an agent that types `state: done` without evidence is rejected by `doctor`. Granularity is calibrated to 'completable in one session'.",
+  "states": [
+    "not-started",
+    "in-progress",
+    "blocked",
+    "done"
+  ],
+  "features": [
+    {
+      "id": "shared-config-and-parser",
+      "behavior": "Both CLIs resolve .agents paths and configuration through one module, and vocabulary lives in contracts/ rather than being retyped in a CLI.",
+      "verify": "npm test",
+      "state": "done",
+      "evidence": "scripts/deep-learn.test.mjs asserts RESEARCH_STATUSES is imported, not retyped; .agents/lib/harness.mjs is the single config loader."
+    },
+    {
+      "id": "config-keys-are-consumed",
+      "behavior": "Every key in .agents/config.json is read by code, and the config-consumer check ignores archived history so a preserved snapshot cannot mask a dead key.",
+      "verify": "npm test && node .agents/bin/deep-learn.mjs doctor --json",
+      "state": "done",
+      "evidence": "scripts/deep-learn.test.mjs 'doctor excludes archived history from the config-consumer scan'; doctor reports 0 config warnings."
+    },
+    {
+      "id": "honest-labels-are-allowed",
+      "behavior": "UNVERIFIED, NOT EXECUTED, and TESTED are legal in strict validation; version honesty is enforced on the topic's own versions field instead of by banning a word.",
+      "verify": "npm test",
+      "state": "done",
+      "evidence": "scripts/deep-learn.test.mjs 'strict validation accepts honest execution labels'; requireVersionVerification checks frontmatter versions."
+    },
+    {
+      "id": "orphan-exceptions-are-tracked",
+      "behavior": "A deliberately broken cross-layer dependency is recorded in .agents/state/exceptions.json with reason, decider, and review date, so doctor stops reporting it as an unknown failure.",
+      "verify": "node .agents/bin/deep-learn.mjs doctor --json",
+      "state": "done",
+      "evidence": "doctor reports the mcp-research-deleted exception for both targets with a 2026-11-01 review date."
+    },
+    {
+      "id": "multi-page-planning-at-scaffold",
+      "behavior": "deep-learn new writes docs/<slug>/learning.md containing objectives, concepts, a multi-page plan, and one assessment per objective, so no topic can be published as an unplanned single page.",
+      "verify": "npm test && node .agents/bin/deep-learn.mjs validate <slug> --strict",
+      "state": "done",
+      "evidence": "scripts/deep-learn.test.mjs 'new writes a multi-page learning design file'; requireLearningDesignFile is enforced in strict validation."
+    },
+    {
+      "id": "review-output-excluded-from-coverage",
+      "behavior": "docs/<slug>/review/ is agent output, so running review-learning cannot invalidate the topic's coverage map.",
+      "verify": "npm test",
+      "state": "done",
+      "evidence": "scripts/deep-learn-visual.test.mjs 'a review report does not invalidate the coverage map'."
+    },
+    {
+      "id": "objective-assessment-coverage",
+      "behavior": "Every objective in a topic's learning design resolves to an assessment on a published page, reported as a coverage ratio rather than assumed.",
+      "verify": "npm test && node .agents/bin/deep-learn-visual.mjs validate <slug> --strict",
+      "state": "done",
+      "evidence": "requireObjectiveAssessmentCoverage enforces it; visual validate --json reports objectiveCoverage."
+    },
+    {
+      "id": "skill-routing-is-deterministic",
+      "behavior": "Every skill declares its invocation mode, ships interface metadata, keeps a short front-loaded description, and appears in the AGENTS.md router.",
+      "verify": "npm test && node .agents/bin/deep-learn.mjs doctor --json",
+      "state": "done",
+      "evidence": "doctor validates invocation, description length, openai.yaml, and router coverage; 9 skills pass."
+    },
+    {
+      "id": "feature-state-and-receipts",
+      "behavior": "harness.mjs reports VCR for the feature list and writes a machine-readable receipt naming the commit, commands, and exit codes for a topic.",
+      "verify": "npm test && node .agents/bin/harness.mjs features --json",
+      "state": "done",
+      "evidence": "scripts/harness.test.mjs covers VCR math, the no-evidence rejection, and receipt writing."
+    },
+    {
+      "id": "ordered-three-layer-gate",
+      "behavior": "A single command runs static, runtime, and system checks in order and refuses to proceed past a failing layer.",
+      "verify": "npm run harness:check",
+      "state": "done",
+      "evidence": "node .agents/bin/harness.mjs check reports PASS for static, runtime, and system, with no SKIPPED layer. scripts/harness.test.mjs covers the skip-on-first-failure rule and the single-layer path."
+    },
+    {
+      "id": "continuous-integration",
+      "behavior": "Every push runs harness:check, npm test, and the production build, so a gate cannot be optional.",
+      "verify": "test -f .github/workflows/harness.yml",
+      "state": "done",
+      "evidence": ".github/workflows/harness.yml runs all three gates on push and pull_request."
+    },
+    {
+      "id": "independent-topic-verification",
+      "behavior": "verify-topic runs as a read-only subagent and writes per-objective verdicts to .agents/reviews/, so a verifier never edits what it verifies.",
+      "verify": "npm test",
+      "state": "done",
+      "evidence": ".agents/skills/verify-topic/SKILL.md with a read-only write scope and receipt requirement."
+    },
+    {
+      "id": "explain-writes-nothing",
+      "behavior": "An ordinary question is answered in chat and creates no files, because an explicit no-write skill removes the temptation to scaffold a research package.",
+      "verify": "npm test && node .agents/bin/deep-learn.mjs doctor --json",
+      "state": "done",
+      "evidence": ".agents/skills/explain/SKILL.md is user-invoked with a zero-file done condition."
+    },
+    {
+      "id": "migrate-mcp-to-multiple-pages",
+      "behavior": "The MCP lesson becomes one overview plus focused child pages with stable routes, shared topicId, and unique pageIds.",
+      "verify": "node .agents/bin/deep-learn-visual.mjs validate model-context-protocol --strict",
+      "state": "blocked",
+      "evidence": null,
+      "blocked_by": "docs/model-context-protocol/ is deleted as pre-existing user work and must not be restored without confirmation. The page predates the multi-page contract and still uses the legacy single-page shape."
+    },
+    {
+      "id": "multi-page-pilot-published",
+      "behavior": "A validated research topic publishes as one overview plus focused child pages, with a learning design, a full coverage map, and complete objective coverage.",
+      "verify": "node .agents/bin/deep-learn-visual.mjs validate learning-harness-redesign --strict",
+      "state": "done",
+      "evidence": "8 pages published (overview, 3 modules, 1 deep-dive, practice, review), 218 coverage rows over 218 research sections, objective coverage 5/5. The production build renders 63 pages."
+    },
+    {
+      "id": "progress-is-evidence-not-mastery",
+      "behavior": "Learner progress is one browser-local store keyed from config, reports recorded answers rather than a mastery state, and says so when storage is unavailable.",
+      "verify": "npm test",
+      "state": "done",
+      "evidence": "scripts/progress-store.test.mjs asserts the storage key matches config, that no component touches localStorage directly, that a corrupt or full store fails soft, and that the fixed 1/3/7/21 schedule is not adaptive."
+    }
+  ]
+}

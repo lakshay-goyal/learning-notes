@@ -1,0 +1,8 @@
+interface:
+  display_name: "Validate Learning Docs"
+  short_description: "Run the ordered gate and review quality"
+  brand_color: "#059669"
+  default_prompt: "Use $validate-learning-docs to run the ordered validation gate on a topic and apply the quality rubrics."
+
+policy:
+  allow_implicit_invocation: true

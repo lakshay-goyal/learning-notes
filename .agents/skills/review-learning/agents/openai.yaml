@@ -1,0 +1,8 @@
+interface:
+  display_name: "Review Learning"
+  short_description: "Audit one topic and recommend what to do next"
+  brand_color: "#0EA5E9"
+  default_prompt: "Use $review-learning to audit my learning on a topic against the official docs and tell me what is covered, partial, missing, and worth doing next."
+
+policy:
+  allow_implicit_invocation: false

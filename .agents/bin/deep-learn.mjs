@@ -1,54 +1,57 @@
 #!/usr/bin/env node
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFrontmatter, FrontmatterError } from '../lib/frontmatter.mjs';
 import { markdownLinks, localLinkTarget, unclosedFence } from '../lib/markdown.mjs';
-import { LEARNING_LEVELS, PAGE_KINDS, TAXONOMY_FACETS } from '../contracts/learning-contract.mjs';
+import {
+  FrontmatterError,
+  INSPECTION_STATUS_SET,
+  RESEARCH_MODE_SET,
+  RESEARCH_STATUS_SET,
+  SOURCE_TYPE_SET,
+  exceptionFor,
+  harnessPath,
+  isResearchOutputPath,
+  isSafeSlug,
+  loadConfig,
+  loadExceptions,
+  markdownFilesUnder,
+  normalizedTitle,
+  readFrontmatter,
+  readJson,
+  relPath,
+  renderTemplate,
+  slugify,
+  topicRecords,
+  walkFiles,
+} from '../lib/harness.mjs';
 
 const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const INDEX_START = '<!-- DEEP_LEARN_INDEX_START -->';
 const INDEX_END = '<!-- DEEP_LEARN_INDEX_END -->';
-const MODES = new Set(['quick', 'deep', 'production', 'codebase', 'review']);
-const SOURCE_TYPES = new Set([
-  'OFFICIAL_DOCUMENTATION',
-  'SPECIFICATION',
-  'SOURCE_CODE',
-  'RELEASE_NOTES',
-  'SECURITY_ADVISORY',
-  'ENGINEERING_BLOG',
-  'RESEARCH_PAPER',
-  'CASE_STUDY',
-  'COMMUNITY_DISCUSSION',
-  'MAINTAINER_COMMENT',
-]);
-const INSPECTION_STATUSES = new Set([
-  'ANALYZED',
-  'SOURCE_INSPECTED',
-  'DISCOVERED_NOT_ANALYZED',
-]);
+
+/**
+ * Placeholders that mean "not finished", checked in strict mode.
+ *
+ * `UNVERIFIED`, `NOT EXECUTED`, and `TESTED` are deliberately absent. They are
+ * the honest execution vocabulary required by `research-policy.md`, and a gate
+ * that banned them punished an author for labelling a version they could not
+ * confirm. Honesty is enforced structurally instead: `requireVersionVerification`
+ * checks the topic's own `versions` frontmatter, and the strict source check
+ * requires a real URL, a justified type, and an inspection status.
+ */
+const UNFINISHED_MARKERS = [
+  { pattern: /\{\{[A-Z_]+\}\}/, label: 'template placeholder {{TOKEN}}' },
+  { pattern: /<!--\s*TODO(?::|\s|--)/i, label: 'TODO comment marker' },
+  { pattern: /example\.invalid/, label: 'placeholder URL example.invalid' },
+  { pattern: /Replace with source title/i, label: 'template text "Replace with source title"' },
+  { pattern: /\bN\/A\b/, label: 'placeholder value "N/A"' },
+];
 
 function fail(message, code = 1) {
   console.error(`Error: ${message}`);
   process.exit(code);
-}
-
-function readJson(path) {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch (error) {
-    fail(`cannot read ${path}: ${error.message}`);
-  }
 }
 
 function takeOption(args, name) {
@@ -67,22 +70,8 @@ function takeFlag(args, name) {
   return true;
 }
 
-function slugify(value) {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-');
-}
-
-function normalizedTitle(value) {
-  return value.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
 function assertSafeSlug(slug) {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+  if (!isSafeSlug(slug)) {
     fail(`invalid topic slug "${slug}"; use lowercase letters, digits, and single hyphens`);
   }
 }
@@ -103,30 +92,6 @@ function parseFrontmatter(content, file) {
     if (error instanceof FrontmatterError) fail(error.message);
     throw error;
   }
-}
-
-function topicRecords(docsDir) {
-  if (!existsSync(docsDir)) return [];
-  const records = [];
-  for (const entry of readdirSync(docsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const readme = join(docsDir, entry.name, 'README.md');
-    if (!existsSync(readme)) continue;
-    const metadata = parseFrontmatter(readFileSync(readme, 'utf8'), readme);
-    records.push({
-      slug: entry.name,
-      title: metadata.title || entry.name,
-      mode: metadata.mode || 'unknown',
-      status: metadata.status || 'unknown',
-      updated: metadata.updated || 'unknown',
-      metadata,
-    });
-  }
-  return records.sort((a, b) => a.title.localeCompare(b.title));
-}
-
-function renderTemplate(content, values) {
-  return content.replace(/\{\{([A-Z_]+)\}\}/g, (match, key) => values[key] ?? match);
 }
 
 function updateIndex(root, config, quiet = false) {
@@ -162,7 +127,9 @@ function newTopic(root, config, args) {
   const mode = (takeOption(args, '--mode') || config.defaultMode || 'deep').toLowerCase();
   const includeRepository = takeFlag(args, '--with-repository-analysis') || mode === 'codebase';
   if (args.length) fail(`unknown argument(s): ${args.join(' ')}`);
-  if (!MODES.has(mode)) fail(`unsupported mode "${mode}"; choose ${[...MODES].join(', ')}`);
+  if (!RESEARCH_MODE_SET.has(mode)) {
+    fail(`unsupported mode "${mode}"; choose ${[...RESEARCH_MODE_SET].join(', ')}`);
+  }
 
   const slug = requestedSlug || slugify(topic);
   if (!slug) fail('topic name does not produce a usable slug');
@@ -181,12 +148,18 @@ function newTopic(root, config, args) {
     process.exit(2);
   }
 
-  const profile = config.requiredCoreFilesByMode?.[mode] || config.requiredCoreFiles || [
+  // A topic's research profile is assembled from declared config, not hardcoded.
+  // `practicalExercisesEnabled: false` must actually remove the exercise file
+  // rather than leaving a dead key that changes nothing.
+  let profile = config.requiredCoreFilesByMode?.[mode] || config.requiredCoreFiles || [
     'README.md',
     'research-plan.md',
     'sources.md',
     'revision.md',
   ];
+  if (!config.practicalExercisesEnabled) {
+    profile = profile.filter((file) => file !== 'exercises.md');
+  }
   const templateNames = new Map([
     ['README.md', mode === 'deep' || mode === 'production' || mode === 'codebase' ? 'lesson.md' : 'lesson-lite.md'],
     ['research-plan.md', 'research-plan.md'],
@@ -196,18 +169,61 @@ function newTopic(root, config, args) {
     ['sources.md', 'sources.md'],
     ['repositories.md', 'repository-analysis.md'],
   ]);
+  // A repository study is capped by config rather than by a number typed into
+  // the methodology prose, so `maximumPrimaryRepositories` actually bounds work.
+  const repoCap = Number.isInteger(config.maximumPrimaryRepositories)
+    ? config.maximumPrimaryRepositories
+    : 3;
+  if (includeRepository && repoCap < 1) {
+    fail('maximumPrimaryRepositories must be at least 1 to use --with-repository-analysis');
+  }
+
   const requestedFiles = [...new Set([...profile, ...(includeRepository ? ['repositories.md'] : [])])];
   const unknownFile = requestedFiles.find((outputName) => !templateNames.has(outputName));
   if (unknownFile) fail(`mode "${mode}" has an unknown required file: ${unknownFile}`);
   const files = requestedFiles.map((outputName) => [templateNames.get(outputName), outputName]);
 
   const date = new Date().toISOString().slice(0, 10);
-  const values = { TOPIC: topic.trim(), SLUG: slug, MODE: mode, DATE: date };
-  const rendered = files.map(([templateName, outputName]) => {
-    const templatePath = join(root, config.researchTemplateDirectory || '.agents/templates/research', templateName);
-    if (!existsSync(templatePath)) fail(`required template not found: ${templatePath}`);
-    return [outputName, renderTemplate(readFileSync(templatePath, 'utf8'), values)];
-  });
+  const plan = planPages(slug, topic.trim(), mode, config);
+  const values = {
+    TOPIC: topic.trim(),
+    SLUG: slug,
+    MODE: mode,
+    DATE: date,
+    TOPIC_ID: slug,
+    PAGE_COUNT: String(plan.pages.length),
+    PAGE_TABLE: renderPagePlanTable(plan),
+    OBJECTIVE_COUNT: String(plan.objectives.length),
+    CONCEPT_COUNT: String(plan.concepts.length),
+    ACCESS_LEVELS: config.requiredLearningLevels.join(', '),
+  };
+
+  // The learning design file is generated in the same atomic scaffold as the
+  // research package. It is the contract the visual stage plans against, so a
+  // topic that has never been designed cannot be published as a one-page mega
+  // lesson by accident.
+  const designTemplateName = 'learning-design.md';
+  const designTemplatePath = join(
+    root,
+    config.researchTemplateDirectory || '.agents/templates/research',
+    designTemplateName,
+  );
+  const learningDesign = [
+    ...files.map(([templateName, outputName]) => {
+      const templatePath = join(root, config.researchTemplateDirectory || '.agents/templates/research', templateName);
+      if (!existsSync(templatePath)) fail(`required template not found: ${templatePath}`);
+      return [outputName, renderTemplate(readFileSync(templatePath, 'utf8'), values)];
+    }),
+    existsSync(designTemplatePath)
+      ? [
+          config.requiredLearningDesignFile,
+          renderTemplate(readFileSync(designTemplatePath, 'utf8'), {
+            ...values,
+            OBJECTIVE_COUNT: String(plan.objectives.length),
+          }),
+        ]
+      : [config.requiredLearningDesignFile, renderLearningDesign(plan, values)],
+  ];
 
   // Render and validate every file before creating the final topic directory.
   // A sibling temporary directory keeps a failed scaffold from becoming an
@@ -215,7 +231,7 @@ function newTopic(root, config, args) {
   const temporaryDir = `${topicDir}.tmp-${process.pid}-${Date.now()}`;
   try {
     mkdirSync(temporaryDir, { recursive: false });
-    for (const [outputName, content] of rendered) {
+    for (const [outputName, content] of learningDesign) {
       writeFileSync(join(temporaryDir, outputName), content);
     }
     renameSync(temporaryDir, topicDir);
@@ -225,18 +241,183 @@ function newTopic(root, config, args) {
   }
 
   updateIndex(root, config, true);
-  console.log(`Created ${relative(root, topicDir)} in ${mode} mode (${rendered.length} Markdown files).`);
+  console.log(
+    `Created ${relative(root, topicDir)} in ${mode} mode ` +
+      `(${learningDesign.length} Markdown files, ${plan.pages.length} planned learning pages).`,
+  );
+  console.log(
+    `Next: edit ${relPath(root, join(topicDir, config.requiredLearningDesignFile))} — objectives and page plan — before publishing.`,
+  );
 }
 
-function walkFiles(path) {
-  const files = [];
-  if (!existsSync(path)) return files;
-  for (const entry of readdirSync(path, { withFileTypes: true })) {
-    const child = join(path, entry.name);
-    if (entry.isDirectory()) files.push(...walkFiles(child));
-    else if (entry.isFile()) files.push(child);
-  }
-  return files;
+/**
+ * Build the default multi-page learning plan for a new topic.
+ *
+ * The old scaffolder produced one flat package and left page count to prose,
+ * which is how a 3,789-word single page shipped. The plan is generated from
+ * `pagePlanning.kindsByMode`, clamped to the declared bounds, and always keeps
+ * exactly one overview plus focused children.
+ */
+function planPages(slug, title, mode, config) {
+  const planning = config.pagePlanning;
+  const kinds = planning.kindsByMode?.[mode] || planning.kindsByMode?.deep || ['overview', 'module', 'practice', 'review'];
+
+  // Always exactly one overview, first.
+  const ordered = ['overview', ...kinds.filter((kind) => kind !== 'overview')];
+  const clamped = ordered.slice(0, Math.max(planning.minimumPageCount, Math.min(planning.maximumPageCount, ordered.length)));
+
+  const objectives = [
+    { id: 'explain-core', statement: `Explain what ${title} is, the problem it solves, and its mental model.` },
+    { id: 'trace-mechanism', statement: `Trace the core mechanism of ${title} step by step, including data and control flow.` },
+    { id: 'apply-practice', statement: `Build or configure a small working example of ${title}.` },
+    { id: 'diagnose-failure', statement: `Diagnose a realistic failure or misuse of ${title}.` },
+    { id: 'evaluate-tradeoffs', statement: `Evaluate ${title} against alternatives and state when not to use it.` },
+  ];
+
+  const concepts = [
+    { id: 'mental-model', name: 'Mental model', statement: 'The smallest accurate picture that makes the rest predictable.' },
+    { id: 'core-mechanism', name: 'Core mechanism', statement: 'The concrete flow that produces the behaviour.' },
+    { id: 'failure-model', name: 'Failure model', statement: 'What breaks, where it surfaces, and why.' },
+    { id: 'tradeoffs', name: 'Trade-offs', statement: 'Cost, limits, and the decision boundary against alternatives.' },
+  ];
+
+  // `pageId` and route must be unique per page, and a page whose `kind` repeats
+  // must not collide with its sibling. Naming by kind alone produced
+  // `redis-streams-module` twice for a topic with two module pages, which the
+  // validator rejects as a duplicate pageId.
+  const used = new Set();
+  const pages = clamped.map((kind, index) => {
+    const base = kind === 'overview' ? slug : `${slug}-${kind}`;
+    let pageId = base;
+    let suffix = 2;
+    while (used.has(pageId)) pageId = `${base}-${suffix++}`;
+    used.add(pageId);
+
+    const level =
+      kind === 'overview'
+        ? 'quick-recall'
+        : kind === 'review' || kind === 'practice'
+          ? 'active-recall'
+          : 'visual-understanding';
+
+    const objectives =
+      kind === 'overview'
+        ? ['explain-core']
+        : kind === 'practice'
+          ? ['apply-practice']
+          : kind === 'review'
+            ? ['diagnose-failure', 'evaluate-tradeoffs']
+            : ['trace-mechanism', 'evaluate-tradeoffs'];
+
+    return {
+      pageId,
+      kind,
+      order: index,
+      level,
+      slug: kind === 'overview' ? slug : `${slug}/${pageId}`,
+      objectives,
+      assessment:
+        kind === 'review'
+          ? `${slug}.consolidated-recall`
+          : kind === 'practice'
+            ? `${slug}.apply-check`
+            : kind === 'overview'
+              ? `${slug}.definition-check`
+              : `${slug}.${kind}-check`,
+    };
+  });
+
+  return { pages, objectives, concepts, title, mode };
+}
+
+/** Markdown table of the planned pages, embedded in the research package. */
+function renderPagePlanTable(plan) {
+  const rows = plan.pages.map(
+    (page) =>
+      `| ${page.order} | \`${page.kind}\` | \`${page.pageId}\` | ${page.level} | ${page.objectives.join(', ')} | ${page.assessment} |`,
+  );
+  return [
+    '| Order | Kind | Page ID | Access level | Objectives | Assessment |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...rows,
+  ].join('\n');
+}
+
+/**
+ * Render `docs/<slug>/learning.md`, the machine-readable learning contract.
+ *
+ * This is the topic manifest `modules/05-harness-architecture.md` specifies and
+ * `prompt.md` phase 1 asks for. It is generated rather than hand-written so a
+ * new topic cannot ship without an objective, an assessment, and a page plan.
+ */
+function renderLearningDesign(plan, values) {
+  const objectiveRows = plan.objectives.map((objective) => `| \`${values.TOPIC_ID}.${objective.id}\` | ${objective.statement} |`).join('\n');
+  const conceptRows = plan.concepts.map((concept) => `| \`${values.TOPIC_ID}.${concept.id}\` | ${concept.name} | ${concept.statement} |`).join('\n');
+
+  return `---
+title: "Learning design: ${plan.title}"
+slug: "${values.SLUG}"
+topicId: "${values.TOPIC_ID}"
+mode: "${values.MODE}"
+status: "draft"
+pageCount: ${plan.pages.length}
+objectiveCount: ${plan.objectives.length}
+---
+
+# Learning design: ${plan.title}
+
+> Generated by \`node .agents/bin/deep-learn.mjs new\`. This file is the contract the visual
+> stage plans against: it defines objectives, concepts, the page set, and the assessment
+> that produces evidence for each objective. Edit the statements; keep the IDs stable.
+
+## Objectives
+
+Observable outcomes. Every objective must be assessable by something other than recognition.
+
+| Objective ID | Statement |
+| --- | --- |
+${objectiveRows}
+
+## Concepts
+
+| Concept ID | Name | What the learner must be able to do with it |
+| --- | --- | --- |
+${conceptRows}
+
+## Page plan
+
+One overview plus focused child pages. Split by learning job, not by section length.
+
+${renderPagePlanTable(plan)}
+
+## Access levels
+
+Every topic supports all four levels, proportionate to the subject:
+
+${config_levels(values)}
+
+## Rules this design must satisfy
+
+- Every page declares at least one \`objectiveIds\` entry and one \`assessmentIds\` entry.
+- Every objective has at least one assessment somewhere in the topic.
+- The overview carries \`level: quick-recall\`; at least one page carries \`active-recall\`.
+- Page routes are stable. Renaming a page requires a migration note.
+- Coverage rows map research level-two headings to a destination anchor or a
+  recorded exclusion reason.
+
+## Validation record
+
+- Deterministic validation: NOT RUN
+- Semantic review: NOT RUN
+- Objective/assessment coverage: NOT RUN
+`;
+}
+
+function config_levels(values) {
+  return values.ACCESS_LEVELS
+    .split(',')
+    .map((level) => `- \`${level.trim()}\``)
+    .join('\n');
 }
 
 function validate(root, config, args) {
@@ -265,27 +446,36 @@ function validate(root, config, args) {
     (kind === 'error' ? errors : warnings).push(item);
   };
 
-  if (!existsSync(indexPath)) {
-    errors.push(`${relative(root, indexPath)}: central knowledge index is missing`);
-  } else {
-    const index = readFileSync(indexPath, 'utf8');
-    if (!index.includes(INDEX_START) || !index.includes(INDEX_END)) {
-      report('error', indexPath, 'DeepLearn index markers are missing');
-    }
-    for (const record of records) {
-      if (!index.includes(`(${record.slug}/)`)) {
-        report('error', indexPath, `missing topic entry for ${record.slug}`);
+  const rules = config.validation || {};
+  const exceptions = loadExceptions(root, config);
+
+  if (rules.requireIndexEntry) {
+    if (!existsSync(indexPath)) {
+      errors.push(`${relative(root, indexPath)}: central knowledge index is missing`);
+    } else {
+      const index = readFileSync(indexPath, 'utf8');
+      if (!index.includes(INDEX_START) || !index.includes(INDEX_END)) {
+        report('error', indexPath, 'DeepLearn index markers are missing');
+      }
+      for (const record of records) {
+        if (!index.includes(`(${record.slug}/)`)) {
+          report('error', indexPath, `missing topic entry for ${record.slug}`);
+        }
       }
     }
   }
 
-  if (config.validation?.failOnNonMarkdownLearningFiles) {
+  if (rules.failOnNonMarkdownLearningFiles) {
+    // The review HTML exception comes from config rather than a hardcoded regex,
+    // so `reviewHtmlException` is a real setting instead of a documented no-op.
+    const exception = config.reviewHtmlException || 'docs/<slug>/review/*.html';
+    const pattern = new RegExp(
+      `^${exception.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace('<slug>', '[^/]+').replace('*', '[^/]*')}$`,
+    );
     for (const file of walkFiles(docsDir)) {
-      if (extname(file).toLowerCase() !== '.md') {
-        const rel = relative(docsDir, file).split(sep).join('/');
-        if (/^[^/]+\/review\/[^/]+\.html$/.test(rel)) continue;
-        report('error', file, 'learning artifacts under docs must be Markdown');
-      }
+      if (extname(file).toLowerCase() === '.md') continue;
+      if (pattern.test(relPath(root, file))) continue;
+      report('error', file, 'learning artifacts under docs must be Markdown');
     }
   }
 
@@ -306,33 +496,62 @@ function validate(root, config, args) {
       if (!existsSync(path)) report('error', path, 'required topic file is missing');
     }
 
+    // The learning design file is what makes a multi-page topic plannable, so
+    // its absence is a structural failure rather than a missing nice-to-have.
+    if (rules.requireLearningDesignFile) {
+      const design = join(topicDir, config.requiredLearningDesignFile || 'learning.md');
+      if (!existsSync(design)) {
+        report('error', design, 'learning design file is missing; a topic needs objectives, concepts, and a page plan');
+      } else {
+        const designText = readFileSync(design, 'utf8');
+        const designMeta = parseFrontmatter(designText, design);
+        if (designMeta.topicId !== record.slug) {
+          report('error', design, `learning design topicId must be "${record.slug}"`);
+        }
+        for (const section of ['## Objectives', '## Page plan']) {
+          if (!designText.includes(section)) {
+            report('error', design, `learning design is missing the "${section.replace('## ', '')}" section`);
+          }
+        }
+        filesToCheck.add(design);
+      }
+    }
+
     const readme = join(topicDir, 'README.md');
     const content = readFileSync(readme, 'utf8');
     const metadata = parseFrontmatter(content, readme);
     if (metadata.slug !== record.slug) report('error', readme, `frontmatter slug must be "${record.slug}"`);
     if (!metadata.title) report('error', readme, 'frontmatter title is missing');
-    if (!MODES.has(metadata.mode)) report('error', readme, `frontmatter mode "${metadata.mode}" is invalid`);
-    if (!['draft', 'researched', 'validated', 'needs-refresh'].includes(metadata.status)) {
-      report('error', readme, `frontmatter status "${metadata.status}" is invalid`);
+    if (!RESEARCH_MODE_SET.has(metadata.mode)) report('error', readme, `frontmatter mode "${metadata.mode}" is invalid`);
+    if (!RESEARCH_STATUS_SET.has(metadata.status)) {
+      report('error', readme, `frontmatter status "${metadata.status}" is invalid; expected one of ${[...RESEARCH_STATUS_SET].join(', ')}`);
     }
     if (strict && metadata.status !== 'validated') {
       report('error', readme, `strict validation requires status "validated", found "${metadata.status}"`);
     }
 
-    for (const file of walkFiles(topicDir).filter((path) => extname(path).toLowerCase() === '.md')) {
+    // Honesty about versions is enforced here, on the field that carries the
+    // claim, rather than by banning the word `UNVERIFIED` everywhere.
+    //
+    // `requireVersionVerification` is read from the top level of config, where it
+    // is declared, not from `validation`. Reading it from the wrong object made
+    // this check permanently inert.
+    if (strict && config.requireVersionVerification && metadata.status === 'validated') {
+      const versions = String(metadata.versions || '').trim();
+      if (!versions) {
+        report('error', readme, 'frontmatter versions is missing; a validated topic must record the version boundary it targets');
+      } else if (/^UNVERIFIED$/i.test(versions)) {
+        report('error', readme, 'frontmatter versions is still UNVERIFIED; a validated topic must record a verified version or specification revision');
+      }
+    }
+
+    for (const file of markdownFilesUnder(topicDir)) {
       filesToCheck.add(file);
       const markdown = readFileSync(file, 'utf8');
-      if (strict) {
-        const unfinished = [
-          /\{\{[A-Z_]+\}\}/,
-          /<!--\s*TODO(?::|\s|--)/i,
-          /\bUNVERIFIED\b/,
-          /\bNOT RUN\b/,
-          /example\.invalid/,
-          /Replace with source title/i,
-        ].find((pattern) => pattern.test(markdown));
-        if (unfinished) report('error', file, `unfinished scaffold marker matched ${unfinished}`);
-      } else if (/<!--\s*TODO(?::|\s|--)/i.test(markdown)) {
+      const finished = UNFINISHED_MARKERS.find((marker) => marker.pattern.test(markdown));
+      if (strict && finished) {
+        report('error', file, `unfinished scaffold marker: ${finished.label}`);
+      } else if (!strict && /<!--\s*TODO(?::|\s|--)/i.test(markdown)) {
         report('warning', file, 'contains unfinished TODO markers');
       }
     }
@@ -349,14 +568,22 @@ function validate(root, config, args) {
         report('error', sources, 'no structured source entry with an HTTP(S) URL found');
       }
       const types = [...sourceContent.matchAll(/^- Source type:\s*`([^`]+)`/gm)].map((match) => match[1]);
-      if (!types.length || types.some((type) => !SOURCE_TYPES.has(type))) {
-        report('error', sources, 'source entries must use recognized source types');
+      if (!types.length || types.some((type) => !SOURCE_TYPE_SET.has(type))) {
+        report('error', sources, `source entries must use recognized source types: ${[...SOURCE_TYPE_SET].join(', ')}`);
       }
       const statuses = [...sourceContent.matchAll(/^- Inspection status:\s*`([^`]+)`/gm)].map(
         (match) => match[1],
       );
-      if (!statuses.length || statuses.some((status) => !INSPECTION_STATUSES.has(status))) {
-        report('error', sources, 'source entries must use recognized inspection statuses');
+      if (!statuses.length || statuses.some((status) => !INSPECTION_STATUS_SET.has(status))) {
+        report('error', sources, `source entries must use recognized inspection statuses: ${[...INSPECTION_STATUS_SET].join(', ')}`);
+      }
+      // A repository study is bounded by config so the cap is enforceable.
+      if (config.repositoryInvestigationDepth === 'source-trace' && existsSync(join(topicDir, 'repositories.md'))) {
+        const inspected = [...readFileSync(join(topicDir, 'repositories.md'), 'utf8').matchAll(/^## Repository:/gm)].length;
+        const cap = Number.isInteger(config.maximumPrimaryRepositories) ? config.maximumPrimaryRepositories : 3;
+        if (inspected > cap) {
+          report('warning', join(topicDir, 'repositories.md'), `${inspected} repositories analyzed, above the configured maximum of ${cap}`);
+        }
       }
     }
   }
@@ -365,6 +592,7 @@ function validate(root, config, args) {
     const content = readFileSync(file, 'utf8');
     const openFence = unclosedFence(content);
     if (openFence) report('error', file, `unclosed ${openFence.marker} fence opened on line ${openFence.line}`);
+    if (!rules.failOnBrokenLocalLinks) continue;
     for (const rawLink of markdownLinks(content)) {
       const target = localLinkTarget(rawLink);
       if (!target) continue;
@@ -448,29 +676,42 @@ function sync(root, config, args) {
 }
 
 /**
- * Keys declared in a config file that appear nowhere in the source tree outside
- * that config file. A declared key with no consumer is a documentation claim
- * that the code does not enforce.
+ * Config keys that no active code or documentation reads.
+ *
+ * A declared key with no consumer is a documentation claim the code does not
+ * enforce: 22 such keys accumulated in `.agents/config.json` while `doctor`
+ * reported zero warnings.
+ *
+ * The cause was a bug in this function. It scanned `.agents/history/`, and
+ * because the preserved pre-consolidation config snapshots repeat every key
+ * name, the regex always matched and the warning never fired. The same file
+ * already excluded `history/` from the legacy-path check, so the exclusion was
+ * simply missed here. History is excluded again, and the regression is covered
+ * by `doctor excludes archived history from the config-consumer scan`.
  */
-function unconsumedConfigKeys(root, configPath, config) {
-  const haystack = [];
+function unconsumedConfigKeys(root, config) {
+  const paths = [];
+  const skip = new Set(['node_modules', '.git', 'dist', '.astro', 'history']);
   const scan = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist' || entry.name === '.astro') {
-        continue;
-      }
+      if (skip.has(entry.name)) continue;
       const child = join(dir, entry.name);
       if (entry.isDirectory()) scan(child);
-      else if (/\.(mjs|js|ts|tsx|astro|mjs|md|json)$/.test(entry.name) && child !== configPath) {
-        haystack.push(readFileSync(child, 'utf8'));
+      // The config file is excluded from its own scan by path. Filtering it out
+      // of the joined text instead would be a silent no-op, because the haystack
+      // holds file *contents*, which never contain the config's own path — and
+      // then every declared key matches itself.
+      else if (/\.(mjs|js|ts|tsx|astro|md|json)$/.test(entry.name) && child !== config.configPath) {
+        paths.push(child);
       }
     }
   };
-  for (const dir of ['.agents', 'scripts', 'src']) {
-    const path = join(root, dir);
+  for (const dir of [config.harnessRoot || '.agents', 'scripts', 'src']) {
+    const path = resolve(root, dir);
     if (existsSync(path)) scan(path);
   }
-  const corpus = haystack.join('\n');
+
+  const haystackWithoutConfig = paths.map((file) => readFileSync(file, 'utf8')).join('\n');
 
   // Walk nested config objects into [dottedPath, bareKey] pairs.
   const flatten = (value, prefix = '') => {
@@ -488,7 +729,7 @@ function unconsumedConfigKeys(root, configPath, config) {
   return flatten(config)
     .filter(([, bare]) => {
       const escaped = bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return !new RegExp(`\\b${escaped}\\b`).test(corpus);
+      return !new RegExp(`\\b${escaped}\\b`).test(haystackWithoutConfig);
     })
     .map(([dotted]) => dotted);
 }
@@ -511,16 +752,25 @@ function validateHarnessLayout(root, config, add) {
   const required = [
     'config.json',
     'README.md',
+    'GLOSSARY.md',
+    'PROGRESS.md',
+    'features.json',
     'contracts/learning-contract.mjs',
+    'contracts/research-contract.mjs',
     'contracts/taxonomy.mjs',
     'lib/anchors.mjs',
     'lib/frontmatter.mjs',
     'lib/markdown.mjs',
+    'lib/harness.mjs',
     'bin/deep-learn.mjs',
     'bin/deep-learn-visual.mjs',
+    'bin/harness.mjs',
     'skills/deep-learn/SKILL.md',
     'skills/deep-learn-visual/SKILL.md',
     'skills/review-learning/SKILL.md',
+    'skills/explain/SKILL.md',
+    'skills/verify-topic/SKILL.md',
+    'skills/migrate-content/SKILL.md',
     'methodology/research/topic-research.md',
     'policies/research-policy.md',
     'workflows/research.md',
@@ -534,13 +784,91 @@ function validateHarnessLayout(root, config, add) {
   ];
   for (const relativePath of required) {
     const file = join(harnessRoot, relativePath);
-    if (!existsSync(file)) add('error', 'harness', `missing canonical harness file: ${relative(root, file)}`);
+    if (!existsSync(file)) add('error', 'harness', `missing canonical harness file: ${relPath(root, file)}`);
   }
 
   for (const legacy of ['.doty', '.agent']) {
     const legacyRoot = join(root, legacy);
     if (existsSync(legacyRoot)) {
       add('error', 'harness', `legacy harness root still exists: ${legacy}/; migrate its contents into ${config.harnessRoot || '.agents'}/`);
+    }
+  }
+
+  // Every skill must declare its frontmatter, its invocation mode, and a short
+  // front-loaded description. These are the checks that keep the routing table
+  // in AGENTS.md truthful.
+  const skillsDir = join(harnessRoot, 'skills');
+  if (existsSync(skillsDir)) {
+    const routerRows = [];
+    for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillFile = join(skillsDir, entry.name, 'SKILL.md');
+      if (!existsSync(skillFile)) {
+        add('error', 'skill', `skill directory has no SKILL.md: .agents/skills/${entry.name}/`);
+        continue;
+      }
+      let meta;
+      try {
+        meta = readFrontmatter(readFileSync(skillFile, 'utf8'), { file: skillFile });
+      } catch (error) {
+        if (error instanceof FrontmatterError) {
+          add('error', 'skill', error.message);
+          continue;
+        }
+        throw error;
+      }
+      if (meta.name !== entry.name) {
+        add('error', 'skill', `${relPath(root, skillFile)}: frontmatter name "${meta.name}" must match its directory "${entry.name}"`);
+      }
+      const description = String(meta.description || '').trim();
+      if (!description) add('error', 'skill', `${relPath(root, skillFile)}: description is missing`);
+      else if (description.length > 200) {
+        add('warning', 'skill', `${relPath(root, skillFile)}: description is ${description.length} chars; every session pays for all descriptions, keep it near 150 and front-load the trigger`);
+      }
+      const invocation = String(meta.invocation || '').trim();
+      if (!invocation) add('error', 'skill', `${relPath(root, skillFile)}: invocation must be "user" or "model"`);
+      else if (!['user', 'model'].includes(invocation)) {
+        add('error', 'skill', `${relPath(root, skillFile)}: invocation "${invocation}" is invalid; expected "user" or "model"`);
+      }
+      // A user-invoked skill must also be marked non-implicit for the harness,
+      // or an ambiguous request can fire it.
+      const interfaceFile = join(skillsDir, entry.name, 'agents/openai.yaml');
+      if (!existsSync(interfaceFile)) {
+        add('warning', 'skill', `${relPath(root, interfaceFile)} is missing; every skill needs interface metadata`);
+      } else if (invocation === 'user') {
+        const yaml = readFileSync(interfaceFile, 'utf8');
+        if (!/allow_implicit_invocation:\s*false/.test(yaml)) {
+          add('error', 'skill', `${relPath(root, interfaceFile)}: a user-invoked skill must set allow_implicit_invocation: false`);
+        }
+      }
+      routerRows.push({ name: entry.name, description, invocation });
+    }
+
+    // The router in AGENTS.md is the routing table every session reads. A skill
+    // it does not mention is a skill the agent cannot reliably reach.
+    const agentsPath = join(root, 'AGENTS.md');
+    if (existsSync(agentsPath)) {
+      const agentsText = readFileSync(agentsPath, 'utf8');
+      for (const row of routerRows) {
+        if (!agentsText.includes(row.name)) {
+          add('warning', 'router', `AGENTS.md routing table does not mention the "${row.name}" skill`);
+        }
+      }
+    }
+  }
+
+  // The glossary keeps shared vocabulary in one file. Without it, "module"
+  // means a research chapter, a page role, and a template scaffold at once.
+  const glossaryPath = harnessPath(root, config, 'glossaryFile', '.agents/GLOSSARY.md');
+  if (!existsSync(glossaryPath)) {
+    add('error', 'glossary', `glossary is missing: ${relPath(root, glossaryPath)}`);
+  } else {
+    // Definition-list form used by the glossary: a bolded term on its own line
+    // followed by a `:` definition line.
+    const glossary = readFileSync(glossaryPath, 'utf8');
+    for (const term of ['Topic', 'Page', 'Objective', 'Concept', 'Assessment', 'Learning design']) {
+      const defined = new RegExp(`^\\*\\*${term}\\*\\*\\s*$|^#{2,6}\\s+.*\\b${term}\\b`, 'm').test(glossary);
+      if (!defined) add('warning', 'glossary', `${relPath(root, glossaryPath)} has no definition for "${term}"`);
     }
   }
 
@@ -586,6 +914,7 @@ function doctor(root, config, args) {
 
   const findings = [];
   const add = (level, category, message) => findings.push({ level, category, message });
+  const exceptions = loadExceptions(root, config);
   validateHarnessLayout(root, config, add);
 
   const docsDir = resolve(root, config.outputDirectory);
@@ -623,17 +952,19 @@ function doctor(root, config, args) {
 
   const publishedSlugs = new Set();
   for (const page of pages) {
+    const target = relPath(root, page.file);
+    const acknowledged = exceptionFor(exceptions, target);
     const slug = page.data.researchSlug;
     if (typeof slug !== 'string' || !slug) {
-      add('error', 'orphan', `${relative(root, page.file)}: learning.researchSlug is missing`);
+      add('error', 'orphan', `${target}: learning.researchSlug is missing`);
       continue;
     }
     publishedSlugs.add(slug);
-    if (!researchSlugs.has(slug)) {
+    if (!researchSlugs.has(slug) && !acknowledged) {
       add(
         'error',
         'orphan',
-        `${relative(root, page.file)}: orphan learning page for research topic "${slug}", which has no docs/${slug}/README.md`,
+        `${target}: orphan learning page for research topic "${slug}", which has no docs/${slug}/README.md`,
       );
     }
   }
@@ -649,19 +980,86 @@ function doctor(root, config, args) {
     const coverageDir = resolve(root, agentConfig.coverageDirectory);
     for (const file of walkFiles(coverageDir).filter((path) => path.endsWith('.md'))) {
       const slug = file.slice(coverageDir.length + 1, -3);
-      if (!researchSlugs.has(slug)) {
-        add(
-          'error',
-          'orphan',
-          `${relative(root, file)}: orphan coverage map for research topic "${slug}", which does not exist`,
-        );
+      const target = relPath(root, file);
+      const acknowledged = exceptionFor(exceptions, target);
+      if (!researchSlugs.has(slug) && !acknowledged) {
+        add('error', 'orphan', `${target}: orphan coverage map for research topic "${slug}", which does not exist`);
       }
     }
   }
 
-  // 4. Config keys with no consumer.
-  for (const key of unconsumedConfigKeys(root, configPath, config)) {
-    add('warning', 'config', `.agents/config.json key "${key}" has no consumer in .agents/, scripts/, or src/`);
+  // 4. Acknowledged exceptions, reported so they cannot rot unnoticed.
+  for (const entry of exceptions.entries) {
+    for (const target of entry.targets || []) {
+      const resolved = resolve(root, target);
+      const stillPresent = existsSync(resolved);
+      const today = new Date().toISOString().slice(0, 10);
+      if (!stillPresent) {
+        add('warning', 'exception', `acknowledged exception "${entry.id}" targets ${target}, which no longer exists; remove the entry`);
+      } else if (entry.reviewBy && today > entry.reviewBy) {
+        add('warning', 'exception', `acknowledged exception "${entry.id}" passed its reviewBy date ${entry.reviewBy}; resolve or renew it`);
+      } else {
+        add('info', 'exception', `acknowledged exception "${entry.id}" covers ${target} until ${entry.reviewBy || 'further notice'}: ${entry.reason}`);
+      }
+    }
+  }
+
+  // 5. Config keys with no consumer. Archived history is excluded so a preserved
+  // pre-consolidation snapshot cannot mask a key nothing reads today.
+  for (const key of unconsumedConfigKeys(root, config)) {
+    add('warning', 'config', `.agents/config.json key "${key}" has no consumer in .agents/, scripts/, or src/ (history excluded)`);
+  }
+
+  // 6. Feature list coherence, when one exists.
+  const featurePath = harnessPath(root, config, 'featureListPath', '.agents/features.json');
+  if (existsSync(featurePath)) {
+    const features = readJson(featurePath);
+    const list = Array.isArray(features.features) ? features.features : [];
+    const validStates = new Set(['not-started', 'in-progress', 'blocked', 'done']);
+    for (const feature of list) {
+      if (!feature.id || !feature.behavior) {
+        add('error', 'feature', `${relPath(root, featurePath)}: feature "${feature.id || '(no id)'}" needs id and behavior`);
+      }
+      if (!feature.verify) {
+        add('error', 'feature', `${relPath(root, featurePath)}: feature "${feature.id}" has no verification command`);
+      }
+      if (!validStates.has(feature.state)) {
+        add('error', 'feature', `${relPath(root, featurePath)}: feature "${feature.id}" state "${feature.state}" is invalid; expected ${[...validStates].join(', ')}`);
+      }
+      if (feature.state === 'done' && !feature.evidence) {
+        add('error', 'feature', `${relPath(root, featurePath)}: feature "${feature.id}" is done but records no evidence; only verification may set done`);
+      }
+    }
+    const inProgress = list.filter((feature) => feature.state === 'in-progress');
+    if (inProgress.length > 1) {
+      add('warning', 'feature', `${inProgress.length} features are in-progress (${inProgress.map((f) => f.id).join(', ')}); WIP=1 is the safe default`);
+    }
+  }
+
+  // 7. Learning design files, so a new topic cannot ship unplanned.
+  for (const slug of researchSlugs) {
+    const design = resolve(docsDir, slug, config.requiredLearningDesignFile || 'learning.md');
+    if (!existsSync(design)) {
+      add('warning', 'planning', `${relPath(root, design)} is missing; run \`node .agents/bin/deep-learn.mjs new\` or author the page plan before publishing`);
+    }
+  }
+
+  // 8. Progress file freshness, so a new session is not read-only by default.
+  const progressPath = harnessPath(root, config, 'progressFile', '.agents/PROGRESS.md');
+  if (!existsSync(progressPath)) {
+    add('warning', 'progress', `${relPath(root, progressPath)} is missing; every session currently re-derives state from scratch`);
+  } else {
+    const progress = readFileSync(progressPath, 'utf8');
+    for (const block of ['## Current state', '## In flight', '## Next session starts', '## Last green baseline']) {
+      if (!progress.includes(block)) add('warning', 'progress', `${relPath(root, progressPath)} is missing the "${block.replace('## ', '')}" block`);
+    }
+    const stamp = progress.match(/updated\s+(\d{4}-\d{2}-\d{2})/i);
+    if (stamp) {
+      const days = Math.floor((Date.now() - Date.parse(`${stamp[1]}T00:00:00Z`)) / 86_400_000);
+      if (Number.isFinite(days) && days > 30) {
+        add('warning', 'progress', `${relPath(root, progressPath)} was last updated ${days} days ago; it is no longer a reliable resume pointer`);
+      }
+    }
   }
 
   const errors = findings.filter((f) => f.level === 'error').length;
@@ -697,6 +1095,9 @@ function printHelp() {
 
 Modes: quick, deep, production, codebase, review
 
+\`new\` also writes the topic's learning design file, which holds the objectives,
+concepts, page plan, and assessments the visual stage plans against.
+
 \`doctor\` and \`sync --check\` are read-only and never repair state.
 
 The internal --root <path> option supports isolated harness tests.`);
@@ -706,7 +1107,12 @@ const args = process.argv.slice(2);
 const root = resolve(takeOption(args, '--root') || SCRIPT_ROOT);
 const configPath = join(root, '.agents/config.json');
 if (!existsSync(configPath)) fail(`DeepLearn config not found: ${configPath}`);
-const config = readJson(configPath);
+let config;
+try {
+  config = loadConfig(root);
+} catch (error) {
+  fail(error.message);
+}
 const harnessName = config.harnessName || 'learning-harness';
 const harnessRoot = config.harnessRoot || '.agents';
 const command = args.shift();

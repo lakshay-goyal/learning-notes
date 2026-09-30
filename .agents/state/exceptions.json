@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "updated": "2026-10-01",
+  "note": "Acknowledged exceptions. Each entry records a decision the harness must not keep reporting as an unknown failure. Remove an entry when the underlying state is resolved; `doctor` then reports the real error again.",
+  "exceptions": [
+    {
+      "id": "mcp-research-deleted",
+      "kind": "orphan-learning-page-and-coverage-map",
+      "targets": [
+        "src/content/docs/ai-engineering/model-context-protocol/index.mdx",
+        ".agents/coverage/model-context-protocol.md"
+      ],
+      "reason": "docs/model-context-protocol/ was deleted as pre-existing user work (prompt.md:29) and must not be restored without explicit confirmation. The published learning page and its coverage map were authored against that package and are preserved rather than deleted, so the visual lesson remains available at its stable route.",
+      "decidedBy": "user",
+      "recorded": "2026-10-01",
+      "reviewBy": "2026-11-01",
+      "resolveWhen": "The user either restores docs/model-context-protocol/ or approves deleting the learning page and coverage map."
+    }
+  ]
+}

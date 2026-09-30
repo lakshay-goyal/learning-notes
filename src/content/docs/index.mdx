@@ -75,16 +75,40 @@ import LearningDashboard from '../../components/learning/LearningDashboard.astro
   </Card>
 </CardGrid>
 
-## How to add a new note
+## How a research topic becomes a lesson
 
-1. Pick a topic folder under `src/content/docs/`, e.g. `ai-engineering/`.
-2. Add a new `.md` or `.mdx` file, e.g. `rag-basics.md`, with frontmatter:
-   ```md
-   ---
-   title: My Note Title
-   description: One-line summary.
-   ---
-   ```
-3. It appears automatically in the sidebar (autogenerate) and is searchable.
+Research topics are produced by the harness in `.agents/`, not by hand:
 
-> Tip: each topic has an `index.md` landing page. Link sub-pages from there for curated learning paths.
+```bash
+node .agents/bin/deep-learn.mjs new "Topic name" --mode deep
+node .agents/bin/harness.mjs check
+```
+
+That writes `docs/<slug>/` — the research package plus `learning.md`, which
+declares the objectives, concepts, and multi-page plan. A second step publishes it
+as learning pages:
+
+```bash
+node .agents/bin/deep-learn-visual.mjs inspect <slug>
+node .agents/bin/harness.mjs check --layer=static
+```
+
+Each topic publishes one overview plus focused pages, so a lesson is a small set
+of pages rather than one long one. The dashboard above groups them by topic.
+
+## Adding a plain note
+
+Ordinary notes that are not research topics do not need the harness. Add a `.md`
+or `.mdx` file under a category folder in `src/content/docs/` with frontmatter:
+
+```md
+---
+title: My Note Title
+description: One-line summary.
+---
+```
+
+It appears in the sidebar and search automatically.
+
+> Tip: a topic's `index.mdx` is the overview page. Link the focused pages from it
+> so the learning path is explicit rather than implied.

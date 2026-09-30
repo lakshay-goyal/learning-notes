@@ -2,6 +2,17 @@
 
 Before authoring, read every Markdown file in the topic research directory. Build `.agents/coverage/<slug>.md` with one row for every level-two source heading.
 
+## What is a coverage source
+
+Every Markdown file under `docs/<slug>/` **except**:
+
+- `learning.md` — the planning contract, not teaching content
+- anything under `review/` — review output, rewritten on every review
+
+Excluding `review/` is what stops a completed review from demanding coverage rows
+for its own headings and breaking the map it just audited. Excluding
+`learning.md` stops every published topic from failing on `## Objectives`.
+
 Each row records:
 
 - source file and heading;

@@ -1,7 +1,8 @@
 interface:
   display_name: "DeepLearn"
-  short_description: "Research and teach technical topics deeply"
-  default_prompt: "Use $deep-learn to research and teach me a technical topic, then save a validated Markdown learning package in docs/."
+  short_description: "Research a topic into a source-backed package"
+  brand_color: "#2563EB"
+  default_prompt: "Use $deep-learn to research and teach me a technical topic, then save a validated Markdown learning package and learning design in docs/."
 
 policy:
   allow_implicit_invocation: true

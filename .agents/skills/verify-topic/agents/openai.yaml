@@ -1,0 +1,8 @@
+interface:
+  display_name: "Verify Topic"
+  short_description: "Independent read-only review with a receipt"
+  brand_color: "#DC2626"
+  default_prompt: "Use $verify-topic to independently review one published topic, record per-objective verdicts, and write a verification receipt."
+
+policy:
+  allow_implicit_invocation: false

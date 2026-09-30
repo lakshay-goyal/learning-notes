@@ -1,0 +1,223 @@
+---
+title: Review · Learning Harness Redesign
+description: Seven levels of progressive retrieval, from mental model to transfer, for the harness redesign topic.
+tags: [quiz]
+learning:
+  id: learning-harness-redesign-review
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign-review
+  kind: review
+  order: 7
+  level: active-recall
+  category: Learning Systems
+  difficulty: advanced
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.diagnose-failure
+    - learning-harness-redesign.evaluate-tradeoffs
+  assessmentIds:
+    - learning-harness-redesign.consolidated-recall
+  conceptIds:
+    - learning-harness-redesign.mental-model
+    - learning-harness-redesign.gates
+  labIds: []
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [testing]
+  toolIds: []
+  prerequisites: []
+  relations: []
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import QuickRecall from '../../../../components/learning/QuickRecall.astro';
+import KnowledgeCheck from '../../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Advanced"
+  version="Snapshot 42b3f13"
+  prerequisites={['This topic, end to end']}
+  researchHref="/research/learning-harness-redesign/revision/"
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+<QuickRecall
+  definition="A review: retrieval under delay. Answer before revealing, then schedule the next pass from what you actually got right."
+  problem="Reading a page feels like learning. Retrieval is what exposes the difference, and a single immediate pass measures familiarity rather than retention."
+  mentalModel="Answer aloud or in writing before revealing. If you could not produce it, you did not have it — regardless of how confident it felt."
+  takeaways={[
+    'Answer before you reveal. A revealed answer proves nothing.',
+    'Space the passes: 1, 3, 7, 21 days by rating.',
+    'Coverage is not retention.',
+  ]}
+  whenToUse="A day or more after reading, and again after each spaced interval."
+/>
+
+<Aside type="caution" title="This schedule is an MVP">
+  The intervals are fixed: 1 day after a miss, 3 after a hard pass, 7 after a
+  recall, 21 after an easy one. That is not adaptive spaced repetition and it is
+  not synchronised across devices. Ratings are recorded in this browser only.
+</Aside>
+
+## Level 1 — Mental model
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r1-governance-vs-learning"
+  category="understanding"
+  prompt="What can a content-governance system prove that a learning system cannot, and what can only a learning system prove?"
+  answer="Governance can prove files, links, schemas, and statuses. Learning must prove the learner can explain, implement, debug, and design. Neither system subsumes the other: a fully governed package can still teach nothing."
+  reviewHref="../#the-problem"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r1-valid-page"
+  category="understanding"
+  prompt="A page passes every validator and is technically correct. Why can it still be pedagogically overwhelming?"
+  answer="Because the validators check structure and evidence, not cognitive load. A 3,789-word single page can be perfectly valid. Load is a design decision, which is why the page model derives page count from objectives rather than from length."
+  reviewHref="../page-model/#the-central-rule"
+/>
+
+## Level 2 — Content ontology
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r2-distinguish"
+  category="understanding"
+  prompt="Distinguish domain, field, skill, topic, module, page, concept, lab, and assessment in one sentence each."
+  answer="Domain: broad practice area. Field: specialty within it. Skill: something a learner can do. Topic: a bounded learning contract. Module: a chapter of research. Page: one focused delivery unit. Concept: an idea the learner operates on. Lab: an artifact producing evidence. Assessment: the activity that evidences an objective."
+  reviewHref="../ontology/#the-canonical-entities"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r2-hierarchical"
+  category="trade-offs"
+  prompt="Which relationship should be hierarchical, and which should not? Why?"
+  answer="Domain → field → topic → page is hierarchical, because a reader navigates one path. Skill, tool, concept, and learning path are many-to-many, because a topic genuinely belongs to several of them. Forcing them into a tree duplicates the topic."
+  reviewHref="../ontology/#which-relationships-are-hierarchical"
+/>
+
+## Level 3 — Mechanisms
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r3-cardinality"
+  category="prediction"
+  prompt="Why does a fixed one-page rule produce a mega-page rather than a refusal?"
+  answer="Because the content must still be published. With splitting forbidden, the only legal destination is one page, so the material compresses into it and the validator reports success. A rule that permits only one shape forces that shape on every topic."
+  reviewHref="../diagnosis/#visual-cardinality-hardcoded"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r3-coverage"
+  category="understanding"
+  prompt="How does heading-to-anchor coverage differ from objective coverage?"
+  answer="Heading coverage asks whether a research section has a destination: it proves reachability. Objective coverage asks whether a declared objective is taught by a page and evidenced by an assessment: it proves design. A section can be perfectly mapped and teach nothing."
+  reviewHref="../gates/#the-gates"
+/>
+
+## Level 4 — Architecture decisions
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r4-identity"
+  category="architecture"
+  prompt="A topic has one overview and five child pages. What must be unique, what must be shared, and what must not move?"
+  answer="Unique: `pageId` and route. Shared: `topicId`, `researchSlug`, and the objective set. Must not move without a migration note: the overview's route, because it is the canonical entry point."
+  reviewHref="../page-model/#the-central-rule"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r4-publisher-claims"
+  category="architecture"
+  prompt="Why may a publisher not introduce a new technical claim?"
+  answer="Because the publisher is a presentation role. A new claim needs evidence, and evidence is the research stage's job. A publisher who adds claims silently makes a polished summary the new source of truth, which is exactly what the two-layer split exists to prevent."
+  reviewHref="../gates/#multi-agent-safety"
+/>
+
+## Level 5 — Harness and agent design
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r5-intent"
+  category="architecture"
+  prompt="Why must intent, depth, scope, and context be separate fields?"
+  answer="They change different things. Intent selects the workflow and its write scope. Depth selects the mode and evidence bar. Scope bounds the topic. Context bounds what the agent reads. Collapsing them means a question can be answered with a research package."
+  reviewHref="../lifecycle/#the-lifecycle"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r5-verifier"
+  category="architecture"
+  prompt="What must be true before parallel module authors start?"
+  answer="The manager has frozen stable IDs, module boundaries, write ownership, dependency order, and the evidence plan. Starting earlier produces rework and conflicting page structures, because two authors will resolve the same ambiguity differently."
+  reviewHref="../gates/#multi-agent-safety"
+/>
+
+## Level 6 — Failure and recovery
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r6-deleted-package"
+  category="debugging"
+  prompt="A research package is deleted while its learning page remains. Which checks should fire, and what is the honest fix?"
+  answer="The content graph must report an orphan learning page, and coverage must report a stale map. The honest fix is a decision: restore the package, or remove the dependents. Recording it as a time-bounded exception is legitimate only if the decision is recorded with a reason and a review date."
+  reviewHref="../gates/#the-gates"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r6-partial-scaffold"
+  category="debugging"
+  prompt="A topic is half-written: README and plan exist, sources and lessons do not. How should the command behave?"
+  answer="Recoverably. Rendering happens in a temporary directory and is renamed into place only once every file is written, so a failed scaffold leaves nothing discoverable. The command should also refuse to overwrite or normalise-duplicate an existing slug."
+  reviewHref="../gates/#recoverable-commands"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="r6-storage-full"
+  category="debugging"
+  prompt="A learner's browser storage is full or disabled. What should the page do?"
+  answer="Fail soft and say so. The content renders normally; progress is reported as unsaveable rather than presented as saved. The page must not imply that a rating was recorded when it was not."
+  reviewHref="../practice/#lab-4--design-the-failure-table"
+/>
+
+## Level 7 — Transfer
+
+Design a learning harness for distributed systems. Your answer must include:
+
+1. a domain, field, and skill registry
+2. a prerequisite graph for one topic
+3. one overview and three child pages, each with a named job
+4. one executable lab
+5. one debugging assessment
+6. one transfer question
+7. a freshness rule for version-sensitive claims
+8. a progress record that does not claim mastery
+9. a multi-agent write-ownership plan
+10. the acceptance tests that prove the migration worked
+
+There is no single correct page count. A strong answer explains why each boundary
+exists and how the system proves a learner can transfer the knowledge.
+
+<CardGrid>
+  <Card title="Practice the labs" icon="pencil">
+    [Practice →](../practice/)
+  </Card>
+  <Card title="Back to the overview" icon="home">
+    [Overview →](../)
+  </Card>
+</CardGrid>
+
+Full guide: [Retrieval guide](/research/learning-harness-redesign/revision/)

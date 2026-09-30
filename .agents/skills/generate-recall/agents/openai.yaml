@@ -1,0 +1,8 @@
+interface:
+  display_name: "Generate Recall"
+  short_description: "Write answer-hidden retrieval practice"
+  brand_color: "#EC4899"
+  default_prompt: "Use $generate-recall to write answer-hidden recall prompts tied to the topic objectives and sections."
+
+policy:
+  allow_implicit_invocation: true

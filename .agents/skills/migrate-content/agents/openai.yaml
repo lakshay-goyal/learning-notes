@@ -1,0 +1,8 @@
+interface:
+  display_name: "Migrate Content"
+  short_description: "Split a topic into overview plus focused pages"
+  brand_color: "#F59E0B"
+  default_prompt: "Use $migrate-content to split a topic into one overview plus focused child pages, preserving routes and building the coverage map."
+
+policy:
+  allow_implicit_invocation: false

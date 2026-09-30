@@ -1,0 +1,8 @@
+interface:
+  display_name: "Explain"
+  short_description: "Answer a question in chat without writing files"
+  brand_color: "#64748B"
+  default_prompt: "Use $explain to answer my question in plain English without creating or changing any files."
+
+policy:
+  allow_implicit_invocation: false

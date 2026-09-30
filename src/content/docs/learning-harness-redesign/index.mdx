@@ -1,0 +1,212 @@
+---
+title: Learning Harness Redesign
+description: Why this learning harness was fighting the learner, and how its topic, page, and validation contracts were rebuilt around objectives instead of artifacts.
+tags: [visual, diagrams]
+learning:
+  id: learning-harness-redesign
+  topicId: learning-harness-redesign
+  pageId: learning-harness-redesign
+  kind: overview
+  order: 0
+  level: quick-recall
+  category: Learning Systems
+  difficulty: intermediate
+  researchSlug: learning-harness-redesign
+  updated: 2026-10-01
+  objectiveIds:
+    - learning-harness-redesign.explain-core
+  assessmentIds:
+    - learning-harness-redesign.definition-check
+  conceptIds:
+    - learning-harness-redesign.mental-model
+  labIds: []
+  domainIds: []
+  fieldIds: [developer-tooling]
+  skillIds: [technical-writing]
+  toolIds: []
+  prerequisites: []
+  relations:
+    - id: ai-engineering
+      type: related
+      label: AI Engineering
+      href: /ai-engineering/
+sidebar:
+  order: 2
+  badge:
+    text: Harness
+    variant: success
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import QuickRecall from '../../../components/learning/QuickRecall.astro';
+import MentalModel from '../../../components/learning/MentalModel.astro';
+import ConceptDiagram from '../../../components/learning/ConceptDiagram.astro';
+import KnowledgeCheck from '../../../components/learning/KnowledgeCheck.astro';
+import RevisionStatus from '../../../components/learning/RevisionStatus.astro';
+import TopicHeader from '../../../components/learning/TopicHeader.astro';
+
+<TopicHeader
+  category="Learning Systems"
+  difficulty="Intermediate"
+  version="Snapshot 42b3f13"
+  prerequisites={['Basic TypeScript', 'How validators and tests work']}
+  researchHref="/research/learning-harness-redesign/"
+  relations={[
+    { type: 'related', label: 'AI Engineering', href: '/ai-engineering/' },
+  ]}
+/>
+
+<RevisionStatus topicId="learning-harness-redesign" title="Learning Harness Redesign" />
+
+<QuickRecall
+  definition="A learning harness is the instructions, contracts, validators, state, and skills that turn a request for a topic into a lesson a learner can be assessed on."
+  problem="The harness looked well governed and still produced a single 3,789-word page that no learner could finish. The contracts were validated, the goals were not."
+  mentalModel="Three layers were designed separately: what an agent should do, what a validator permits, and what a learner finally sees. When they disagree the validator wins, because prose cannot reject a file."
+  takeaways={[
+    'A strong exemplar becomes a platform constraint when it is copied into a validator.',
+    'Structure is checkable; learning outcomes are not, unless objectives are declared and assessed.',
+    'Make the desired shape legal before improving the prompt that describes it.',
+  ]}
+  whenToUse="When a content system is well governed and still produces material nobody finishes."
+/>
+
+<Aside type="tip" title="Start here">
+  This is the overview. Six focused pages follow, and the complete research stays
+  readable at <a href="/research/learning-harness-redesign/">/research/learning-harness-redesign/</a>.
+  Do not read every chapter linearly.
+</Aside>
+
+## The problem
+
+The repository had good instincts and a broken shape.
+
+```text
+Methodology      → what an agent should ideally do
+CLI contracts    → what the agent is allowed to produce
+Astro app        → what the learner is eventually shown
+```
+
+Those three were designed separately and never reconciled. The gap was not
+content quality. The content was thoughtful and source-aware. The gap was that one
+topic's accidental shape had been encoded as the platform.
+
+## Three root causes
+
+**Research organised by artifact type.** Every topic produced the same flat
+siblings — lesson, plan, sources, implementation, exercises, revision. Convenient
+for a validator, but not a learner journey: understanding one mechanism meant
+moving across six document types.
+
+**Visual cardinality hardcoded.** The validator required exactly one learning page
+per research slug. A methodology describing four access levels and a page hierarchy
+met a machine rule that permitted none of it. Route-level disclosure existed in the
+design; section-level disclosure existed in the implementation.
+
+**Coverage counted reachability, not teaching.** A coverage map asked whether a
+research heading had a destination anchor. That proves a finding can be found. It
+says nothing about whether an objective is taught, assessed, or retained.
+
+<MentalModel
+  title="Accidental architecture"
+  model="When one exemplar is thorough, its shape becomes the contract: the validator is written to reproduce that success, and every later topic is forced into it."
+  boundary="This is not an argument against thorough exemplars. It is an argument for validating the desired alternative in a small fixture before migrating real content."
+/>
+
+## What changed
+
+<ConceptDiagram
+  id="harness-contract-shape"
+  title="How a topic moves through the harness"
+  question="Which layer decides what a topic is allowed to become?"
+  nodes={[
+    { id: 'request', label: 'Request', x: 6, y: 22, detail: 'Intent is routed before any file is written. An explanation stops here.' },
+    { id: 'design', label: 'Learning design', x: 30, y: 12, detail: 'learning.md declares objectives, concepts, and the page plan before research goes deep.' },
+    { id: 'research', label: 'Research', x: 30, y: 46, detail: 'Source-backed Markdown with an honest version boundary and honest execution labels.' },
+    { id: 'contract', label: 'Contracts', x: 56, y: 29, detail: 'topicId, pageId, page kind, objectives, assessments, taxonomy IDs.' },
+    { id: 'gate', label: 'Gates', x: 79, y: 22, detail: 'Static, then runtime, then system. A failing layer stops the run.' },
+    { id: 'learner', label: 'Learner pages', x: 79, y: 58, detail: 'One overview plus focused pages. Evidence, not a mastery claim.' },
+  ]}
+  edges={[
+    { from: 'request', to: 'design', label: 'new' },
+    { from: 'request', to: 'research', label: 'new' },
+    { from: 'design', to: 'contract', label: 'declares' },
+    { from: 'research', to: 'contract', label: 'verified by' },
+    { from: 'contract', to: 'gate', label: 'checked' },
+    { from: 'gate', to: 'learner', label: 'publishes' },
+  ]}
+/>
+
+Click any node. The important detail: the learning design exists **before** the
+prose, so the page set is a decision rather than an afterthought.
+
+## The rebuilt contracts
+
+| Before | Now |
+| --- | --- |
+| One page per research slug | One overview plus focused child pages |
+| `learning.id` was both topic and page | Separate `topicId` and `pageId` |
+| Heading-to-anchor coverage | Objective, concept, page, assessment coverage |
+| Flat package per mode | Mode-specific profile plus a learning design |
+| Config keys with no consumer | Every config key read by code, checked by `doctor` |
+| Self-reported validation | Ordered gates plus machine-written receipts |
+
+## Where to go next
+
+<CardGrid>
+  <Card title="Why it fights the learner" icon="magnifier">
+    The two root causes, the evidence, and why a better prompt was not the first fix.
+    [Module 1 →](./diagnosis/)
+  </Card>
+  <Card title="Content ontology" icon="sitemap">
+    Domain, field, skill, topic, module, page, concept, lab, assessment, and which
+    relationships should be hierarchical. [Module 2 →](./ontology/)
+  </Card>
+  <Card title="The topic-module-page model" icon="copy">
+    When a topic needs child pages, when one page is right, and how routes stay
+    stable. [Module 3 →](./page-model/)
+  </Card>
+  <Card title="Learning lifecycle" icon="cycle">
+    Route intent to a workflow and name that workflow's success measure.
+    [Module 4 →](./lifecycle/)
+  </Card>
+  <Card title="Quality gates" icon="shield">
+    Which gate catches a given failure, and what its error message must say.
+    [Module 5 →](./gates/)
+  </Card>
+  <Card title="Practice and review" icon="pencil">
+    Apply the contract to a new topic, then retrieve it under delay.
+    [Practice →](./practice/) · [Review →](./review/)
+  </Card>
+</CardGrid>
+
+## Test yourself
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="definition-check"
+  category="recall"
+  prompt="Name the three layers that were designed separately, and say which one wins when they disagree."
+  answer="Methodology (what an agent should do), CLI contracts (what it is allowed to produce), and the Astro app (what the learner sees). The validator wins, because a validator can reject a file while prose can only advise the model."
+  misconception="Assuming the prompt layer wins because it is read first. Prose cannot reject anything; only a contract can."
+  reviewHref="./diagnosis/#the-architecture-principle"
+/>
+
+<KnowledgeCheck
+  topicId="learning-harness-redesign"
+  questionId="coverage-is-not-teaching"
+  category="understanding"
+  prompt="A research heading maps to a destination anchor. What has been proven, and what has not?"
+  answer="Proven: the finding is reachable from a published page. Not proven: that it is understood, assessable, or retained. Coverage is reachability, which is why objective coverage was added as a separate gate."
+  misconception="Treating a complete coverage map as evidence of learning quality."
+  reviewHref="./gates/#the-gates-that-must-exist"
+/>
+
+## Complete research access
+
+Everything above is a reading path, not a summary.
+
+- [Research package](/research/learning-harness-redesign/) — the full record
+- [Implementation blueprint](/research/learning-harness-redesign/implementation/)
+- [Exercises and workshop](/research/learning-harness-redesign/exercises/)
+- [Retrieval guide](/research/learning-harness-redesign/revision/)
+- [Source ledger](/research/learning-harness-redesign/sources/)
