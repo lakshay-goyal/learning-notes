@@ -9,7 +9,7 @@ Turn a technical question into durable engineering knowledge: verified research,
 
 ## Start
 
-1. Find the repository root and read `.doty/config.json`, `.doty/workflow.md`, and `.doty/research-policy.md` completely.
+1. Find the repository root and read `.agents/config.json`, `.agents/workflows/research.md`, and `.agents/policies/research-policy.md` completely.
 2. Determine whether this is a new topic, incremental update, or review. Select `quick`, `deep` (default), `production`, `codebase`, or `review` using the workflow criteria.
 3. Inspect `docs/README.md`, search existing topic metadata/content, and read related packages before researching. Reuse knowledge without reusing stale version-sensitive claims.
 4. Assess actual web, official-doc, GitHub/source, filesystem, Git, shell, and execution capabilities. Record unavailable capabilities and the quality impact; never simulate inaccessible research.
@@ -20,23 +20,23 @@ Do not modify the Astro application. All generated learning content belongs unde
 
 For a new topic, read the modules as their stages become relevant:
 
-- Planning/classification: [topic research](../../../.doty/skills/topic-research.md)
-- Official sources and versions: [documentation analysis](../../../.doty/skills/documentation-analysis.md)
-- Real engineering evidence: [industry research](../../../.doty/skills/industry-research.md)
-- Repository discovery and source tracing: [repository analysis](../../../.doty/skills/repository-analysis.md)
-- Lesson/examples: [technical teaching](../../../.doty/skills/technical-teaching.md) and `.doty/teaching-policy.md`
-- Production mode or applicable operations: [production analysis](../../../.doty/skills/production-analysis.md)
-- Projects/exercises: [project generator](../../../.doty/skills/project-generator.md)
-- Final review: [research validation](../../../.doty/skills/research-validation.md) and `.doty/validation-policy.md`
+- Planning/classification: [topic research](../../../.agents/methodology/research/topic-research.md)
+- Official sources and versions: [documentation analysis](../../../.agents/methodology/research/documentation-analysis.md)
+- Real engineering evidence: [industry research](../../../.agents/methodology/research/industry-research.md)
+- Repository discovery and source tracing: [repository analysis](../../../.agents/methodology/research/repository-analysis.md)
+- Lesson/examples: [technical teaching](../../../.agents/methodology/research/technical-teaching.md) and `.agents/policies/teaching-policy.md`
+- Production mode or applicable operations: [production analysis](../../../.agents/methodology/research/production-analysis.md)
+- Projects/exercises: [project generator](../../../.agents/methodology/research/project-generator.md)
+- Final review: [research validation](../../../.agents/methodology/research/research-validation.md) and `.agents/policies/validation-policy.md`
 
-For an incremental request, follow the incremental branch in `.doty/workflow.md`, edit the existing package, and avoid duplicate folders. For review mode, read [knowledge review](../../../.doty/skills/knowledge-review.md) and conduct an interactive engineering review grounded in the existing package.
+For an incremental request, follow the incremental branch in `.agents/workflows/research.md`, edit the existing package, and avoid duplicate folders. For review mode, read [knowledge review](../../../.agents/methodology/research/knowledge-review.md) and conduct an interactive engineering review grounded in the existing package.
 
 ## Operate
 
 - Scaffold only after the research scope is understood:
 
   ```bash
-  node scripts/deep-learn.mjs new "<topic>" --mode <mode>
+  node .agents/bin/deep-learn.mjs new "<topic>" --mode <mode>
   ```
 
   Add `--with-repository-analysis` when source study is planned. The command refuses to overwrite or create a normalized duplicate.
@@ -51,13 +51,13 @@ For an incremental request, follow the incremental branch in `.doty/workflow.md`
 
 ## Finish
 
-1. Run `node scripts/deep-learn.mjs validate <slug> --strict` and fix deterministic failures.
-2. Perform the semantic gate in `.doty/validation-policy.md`; leave unresolved questions visible.
+1. Run `node .agents/bin/deep-learn.mjs validate <slug> --strict` and fix deterministic failures.
+2. Perform the semantic gate in `.agents/policies/validation-policy.md`; leave unresolved questions visible.
 3. Set topic status to `validated` only after both gates, update its history/date, then run:
 
    ```bash
-   node scripts/deep-learn.mjs index
-   node scripts/deep-learn.mjs validate --all --strict
+   node .agents/bin/deep-learn.mjs index
+   node .agents/bin/deep-learn.mjs validate --all --strict
    ```
 
 4. Report what was researched, what was source-inspected/tested, limitations, package paths, and next useful topics. Never describe a scaffold or structurally valid draft as complete research.

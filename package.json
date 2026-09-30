@@ -9,8 +9,11 @@
 		"preview": "astro preview",
 		"astro": "astro",
 		"test": "node --test scripts/*.test.mjs",
-		"validate:research": "node scripts/deep-learn.mjs validate --all --strict",
-		"validate:learning": "node scripts/deep-learn-visual.mjs validate --all --strict"
+		"validate:research": "node .agents/bin/deep-learn.mjs validate --all --strict",
+		"validate:learning": "node .agents/bin/deep-learn-visual.mjs validate --all --strict",
+		"doctor": "node .agents/bin/deep-learn.mjs doctor",
+		"harness:sync": "node .agents/bin/deep-learn.mjs sync",
+		"harness:check": "node .agents/bin/deep-learn.mjs sync --check && npm run validate:research && npm run validate:learning"
 	},
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.4.1",
@@ -20,6 +23,8 @@
     "astro-live-code": "^0.0.6",
     "astro-mermaid-satteri": "^0.3.3",
     "echarts": "^6.1.0",
+    "github-slugger": "^2.0.0",
+    "js-yaml": "^4.3.2",
     "mermaid": "^11.17.2",
     "sharp": "^0.35.3",
     "starlight-codeblock-fullscreen": "^2.0.0",

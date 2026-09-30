@@ -4,22 +4,24 @@ This directory is the Markdown source of truth for DeepLearn research packages. 
 
 ## Using this knowledge base
 
-- Start a topic: `node scripts/deep-learn.mjs new "Topic name" --mode deep`
-- Refresh the index: `node scripts/deep-learn.mjs index`
-- Validate a draft: `node scripts/deep-learn.mjs validate <topic-slug>`
-- Validate completed research: `node scripts/deep-learn.mjs validate <topic-slug> --strict`
+- Start a topic: `node .agents/bin/deep-learn.mjs new "Topic name" --mode deep`
+- Refresh the index: `node .agents/bin/deep-learn.mjs index`
+- Validate a draft: `node .agents/bin/deep-learn.mjs validate <topic-slug>`
+- Validate completed research: `node .agents/bin/deep-learn.mjs validate <topic-slug> --strict`
 
 Ask Codex to “Use DeepLearn to teach me …”, “go deeper into …”, or “review my understanding of …” to run the agent-driven workflow.
 
-To publish validated research as a visual, retention-focused Astro lesson, ask Codex to “Use DeepLearn Visual to publish my … research.” The visual layer preserves these files as the source of truth, records section-level coverage in `.agent/coverage/`, and exposes the original Markdown under `/research/<topic>/`.
+To publish validated research as a visual, retention-focused Astro lesson, ask Codex to “Use DeepLearn Visual to publish my … research.” The visual layer preserves these files as the source of truth, records section-level coverage in `.agents/coverage/`, and exposes the original Markdown under `/research/<topic>/`.
 
 ## Topics
+
+> **New interactive guide:** start with [Learning Harness Redesign](learning-harness-redesign/) for a chapter-based path through the architecture audit. Read the overview first; do not consume every chapter linearly.
 
 <!-- DEEP_LEARN_INDEX_START -->
 
 | Topic | Mode | Status | Updated |
 | --- | --- | --- | --- |
-| [Model Context Protocol](model-context-protocol/) | `deep` | `validated` | 2026-09-21 |
+| [Learning Harness Redesign](learning-harness-redesign/) | `deep` | `validated` | 2026-09-28 |
 
 <!-- DEEP_LEARN_INDEX_END -->
 
