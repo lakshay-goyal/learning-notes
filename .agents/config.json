@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "harnessName": "learning-harness",
+  "harnessRoot": ".agents",
+  "outputDirectory": "docs",
+  "defaultMode": "deep",
+  "preferredProgrammingLanguage": "TypeScript",
+  "preferredFrontendFramework": "React and Next.js",
+  "preferredBackendEnvironment": "Node.js",
+  "preferredMobileEnvironment": "React Native and Expo",
+  "preferredCloudPlatform": "AWS with Terraform",
+  "repositoryInvestigationDepth": "source-trace",
+  "maximumPrimaryRepositories": 3,
+  "projectIdeasEnabled": true,
+  "practicalExercisesEnabled": true,
+  "requireVersionVerification": true,
+  "includeProductionAnalysisByDefault": true,
+  "requiredCoreFiles": [
+    "README.md",
+    "research-plan.md",
+    "sources.md",
+    "revision.md"
+  ],
+  "requiredCoreFilesByMode": {
+    "quick": ["README.md", "research-plan.md", "sources.md", "revision.md"],
+    "deep": ["README.md", "research-plan.md", "implementation.md", "exercises.md", "revision.md", "sources.md"],
+    "production": ["README.md", "research-plan.md", "implementation.md", "exercises.md", "revision.md", "sources.md", "repositories.md"],
+    "codebase": ["README.md", "research-plan.md", "implementation.md", "exercises.md", "revision.md", "sources.md", "repositories.md"],
+    "review": ["README.md", "research-plan.md", "sources.md", "revision.md"]
+  },
+  "researchDirectory": "docs",
+  "researchTemplateDirectory": ".agents/templates/research",
+  "visualTemplateDirectory": ".agents/templates/visual",
+  "taxonomyRegistry": ".agents/registry/taxonomy.json",
+  "learningDirectory": "src/content/docs",
+  "coverageDirectory": ".agents/coverage",
+  "learningComponentsDirectory": "src/components/learning",
+  "researchRoutePrefix": "/research",
+  "progressStorage": "browser-local",
+  "progressStorageKey": "deep-learn-visual:v2",
+  "requiredLearningLevels": [
+    "quick-recall",
+    "visual-understanding",
+    "complete-understanding",
+    "active-recall"
+  ],
+  "validation": {
+    "failOnBrokenLocalLinks": true,
+    "failOnNonMarkdownLearningFiles": true,
+    "reviewHtmlException": "docs/<slug>/review/*.html",
+    "requireIndexEntry": true,
+    "requireCoverageMap": true,
+    "requireResearchLink": true,
+    "requireStableTopicId": true,
+    "requireAstroBuild": true
+  }
+}

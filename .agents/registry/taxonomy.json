@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "domainIds": [
+    "ai-engineering",
+    "software-development",
+    "devops",
+    "mobile-development",
+    "ui-design",
+    "soft-skills",
+    "system-design"
+  ],
+  "fieldIds": [
+    "agent-integration",
+    "distributed-protocols",
+    "api-design",
+    "developer-tooling",
+    "frontend-engineering",
+    "cloud-infrastructure"
+  ],
+  "skillIds": [
+    "typescript",
+    "javascript",
+    "api-design",
+    "debugging",
+    "secure-integration",
+    "testing",
+    "technical-writing"
+  ],
+  "toolIds": [
+    "git",
+    "docker",
+    "linux",
+    "astro",
+    "starlight"
+  ]
+}
